@@ -11,42 +11,29 @@
 
 /**
  * @class BleManager
- * @brief Manages Bluetooth Low Energy (BLE) operations including initialization, handling callbacks, and managing notifications.
- *
- * The BleManager class encapsulates the functionality required to set up and manage BLE services,
- * handle GATT server events, process write events, and send notifications to connected BLE clients.
+ * @brief Manages Bluetooth Low Energy (BLE) operations.
  */
 class BleManager
 {
   public:
     /**
      * @brief Constructs a new BleManager object.
-     *
-     * Initializes member variables and prepares the BLE manager for initialization.
      */
     BleManager();
 
     /**
      * @brief Destructs the BleManager object.
-     *
-     * Cleans up resources such as semaphores and ensures proper shutdown of BLE operations.
      */
     ~BleManager();
 
     /**
      * @brief Initializes the BLE manager.
-     *
-     * Sets up BLE configurations, registers GATT callbacks, and starts advertising.
-     * This method should be called after constructing the BleManager object to begin BLE operations.
      */
     void Init();
 
   private:
     /**
      * @brief Static GATT Server callback function.
-     *
-     * Serves as a static entry point for GATT server events and forwards them to the instance's callback handler.
-     *
      * @param event The GATT server event type.
      * @param gatts_if The GATT interface.
      * @param param Pointer to the event parameters.
@@ -55,9 +42,6 @@ class BleManager
 
     /**
      * @brief Instance GATT Server callback handler.
-     *
-     * Handles GATT server events specific to this BleManager instance.
-     *
      * @param event The GATT server event type.
      * @param gatts_if The GATT interface.
      * @param param Pointer to the event parameters.
@@ -66,29 +50,33 @@ class BleManager
 
     /**
      * @brief Handles write events from BLE clients.
-     *
-     * Processes data written by connected BLE clients and delegates commands to the CommandManager.
-     *
      * @param write The parameters associated with the write event.
      */
     void HandleWriteEvent(const esp_ble_gatts_cb_param_t::gatts_write_evt_param &write);
 
     /**
      * @brief Sends a notification to connected BLE clients.
-     *
-     * Transmits a notification containing the specified response string to all clients that have notifications enabled.
-     *
      * @param response The response string to send as a notification.
      */
-    void SendNotification(const std::string &response);
+    void SendNotification(const std::string &response, uint16_t conn_id);
 
-    /// Singleton instance of BleManager
-    static BleManager *instance;
+    /**
+     * @brief Adds a connection to the connection list.
+     * @param conn_id The connection ID to add.
+     */
+    void AddConnection(uint16_t conn_id);
 
-    /// Manages command processing and execution
-    CommandManager commandManager;
+    /**
+     * @brief Removes a connection from the connection list.
+     * @param conn_id The connection ID to remove.
+     */
+    void RemoveConnection(uint16_t conn_id);
 
-    // UUIDs for BLE service and characteristics
+    static BleManager *instance; ///< Singleton instance of the BLE Manager.
+
+    CommandManager commandManager; ///< Command manager for handling BLE commands.
+
+    // UUIDs
     static const uint16_t SERVICE_UUID;
     static const uint16_t CHAR_UUID_WRITE;
     static const uint16_t CHAR_UUID_NOTIFY;
@@ -96,47 +84,31 @@ class BleManager
     static const uint16_t GATT_UUID_CHAR_DECLARE;
     static const uint16_t GATT_UUID_CHAR_CLIENT_CONFIG;
 
-    /// Represents an invalid connection identifier
+    // BLE connection constants
     static const uint16_t INVALID_CONN_ID;
+    static const uint8_t  PROFILE_APP_IDX;
+    static const uint8_t  SVC_INST_ID;
 
-    /// Profile application index
-    static const uint8_t PROFILE_APP_IDX;
-
-    /// Service instance identifier
-    static const uint8_t SVC_INST_ID;
-
-    /// Properties for the write characteristic
+    // BLE characteristics properties
     static uint8_t char_prop_write;
-
-    /// Properties for the notify characteristic
     static uint8_t char_prop_notify;
 
-    /// Current connection identifier
-    static uint16_t connection_id;
+    // Maximum BLE connections
+    static const int MAX_CONNECTIONS = 9;
+    static uint16_t  connection_ids[MAX_CONNECTIONS];        ///< List of connection IDs.
+    static bool      notifications_enabled[MAX_CONNECTIONS]; ///< List of notification statuses.
 
-    /// Handle for the notify characteristic
-    uint16_t notify_handle;
-
-    /// Global GATT interface
-    esp_gatt_if_t gatts_if_global;
-
-    /// Flag indicating if notifications are enabled
-    bool notifications_enabled;
-
-    /// Flag indicating if a notification is currently in progress
-    bool notification_in_progress;
-
-    /// Mutex to protect shared resources
-    SemaphoreHandle_t resource_mutex;
-
-    /// Advertising data array
-    static uint8_t adv_data[];
-
-    /// Advertising parameters
+    // BLE advertising data and parameters
+    static uint8_t              adv_data[];
     static esp_ble_adv_params_t adv_params;
 
-    /// GATT database configuration
+    // BLE GATT attributes
     static esp_gatts_attr_db_t gatt_db[];
+
+    uint16_t          notify_handle;            ///< Handle for notifications.
+    esp_gatt_if_t     gatts_if_global;          ///< Global GATT interface.
+    bool              notification_in_progress; ///< Indicates if a notification is in progress.
+    SemaphoreHandle_t resource_mutex;           ///< Mutex for protecting shared resources.
 };
 
 #endif // BLE_MANAGER_HPP
