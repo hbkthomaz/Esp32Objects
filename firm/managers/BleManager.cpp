@@ -3,6 +3,7 @@
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
+#include "esp_log.h"
 #include <cstring>
 
 BleManager *BleManager::instance = nullptr;
@@ -21,7 +22,8 @@ const uint8_t  BleManager::SVC_INST_ID     = 0;
 uint8_t BleManager::char_prop_write  = ESP_GATT_CHAR_PROP_BIT_WRITE;
 uint8_t BleManager::char_prop_notify = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 
-uint16_t BleManager::connection_id = BleManager::INVALID_CONN_ID;
+uint16_t BleManager::connection_ids[MAX_CONNECTIONS]        = {BleManager::INVALID_CONN_ID};
+bool     BleManager::notifications_enabled[MAX_CONNECTIONS] = {false};
 
 static uint8_t  char_value_write[128]  = {0};
 static uint8_t  char_value_notify[128] = {0};
@@ -30,8 +32,8 @@ static uint16_t ccc_value_notify       = 0x0000;
 uint8_t BleManager::adv_data[] = {0x02, 0x01, 0x06, 0x03, 0x03, 0xFF, 0x00, 0x0A, 0x09, 'E', 'S', 'P', '3', '2', '_', 'B', 'L', 'E'};
 
 esp_ble_adv_params_t BleManager::adv_params = {
-    .adv_int_min       = 0x30,
-    .adv_int_max       = 0x70,
+    .adv_int_min       = 0x20,
+    .adv_int_max       = 0x40,
     .adv_type          = ADV_TYPE_IND,
     .own_addr_type     = BLE_ADDR_TYPE_PUBLIC,
     .peer_addr         = {0x00},
@@ -61,12 +63,16 @@ esp_gatts_attr_db_t BleManager::gatt_db[] = {
      sizeof(uint16_t), (uint8_t *)&ccc_value_notify}},
 };
 
-BleManager::BleManager() :
-    notify_handle(0), gatts_if_global(0), notifications_enabled(false), notification_in_progress(false), resource_mutex(nullptr)
+BleManager::BleManager() : notify_handle(0), gatts_if_global(0), notification_in_progress(false), resource_mutex(nullptr)
 {
     if (instance == nullptr)
     {
         instance = this;
+    }
+    for (int i = 0; i < MAX_CONNECTIONS; ++i)
+    {
+        connection_ids[i]        = INVALID_CONN_ID;
+        notifications_enabled[i] = false;
     }
 }
 
@@ -82,70 +88,76 @@ BleManager::~BleManager()
 
 void BleManager::Init()
 {
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    do
     {
-        ret = nvs_flash_erase();
-        if (ret == ESP_OK)
+        esp_err_t ret = nvs_flash_init();
+        if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
         {
-            ret = nvs_flash_init();
+            ret = nvs_flash_erase();
+            if (ret == ESP_OK)
+            {
+                ret = nvs_flash_init();
+            }
         }
-    }
-    if (ret != ESP_OK)
-    {
-        return;
-    }
+        if (ret != ESP_OK)
+        {
+            break;
+        }
 
-    ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
-    if (ret != ESP_OK)
-    {
-        return;
-    }
+        ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+        if (ret != ESP_OK)
+        {
+            break;
+        }
 
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    ret                               = esp_bt_controller_init(&bt_cfg);
-    if (ret != ESP_OK)
-    {
-        return;
-    }
-    ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
-    if (ret != ESP_OK)
-    {
-        return;
-    }
+        esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+        ret                               = esp_bt_controller_init(&bt_cfg);
+        if (ret != ESP_OK)
+        {
+            break;
+        }
 
-    ret = esp_bluedroid_init();
-    if (ret != ESP_OK)
-    {
-        return;
-    }
-    ret = esp_bluedroid_enable();
-    if (ret != ESP_OK)
-    {
-        return;
-    }
+        ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
+        if (ret != ESP_OK)
+        {
+            break;
+        }
 
-    if (resource_mutex == nullptr)
-    {
-        resource_mutex = xSemaphoreCreateMutex();
+        ret = esp_bluedroid_init();
+        if (ret != ESP_OK)
+        {
+            break;
+        }
+        ret = esp_bluedroid_enable();
+        if (ret != ESP_OK)
+        {
+            break;
+        }
+
         if (resource_mutex == nullptr)
         {
-            return;
+            resource_mutex = xSemaphoreCreateMutex();
+            if (resource_mutex == nullptr)
+            {
+                break;
+            }
         }
-    }
 
-    ret = esp_ble_gatts_register_callback(GATTSCallbackStatic);
-    if (ret != ESP_OK)
-    {
-        return;
-    }
-    ret = esp_ble_gatts_app_register(PROFILE_APP_IDX);
-    if (ret != ESP_OK)
-    {
-        return;
-    }
+        ret = esp_ble_gatts_register_callback(GATTSCallbackStatic);
+        if (ret != ESP_OK)
+        {
+            break;
+        }
 
-    commandManager.Init();
+        ret = esp_ble_gatts_app_register(PROFILE_APP_IDX);
+        if (ret != ESP_OK)
+        {
+            break;
+        }
+
+        commandManager.Init();
+
+    } while (0);
 }
 
 void BleManager::GATTSCallbackStatic(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
@@ -177,34 +189,17 @@ void BleManager::GATTSCallback(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_i
             break;
 
         case ESP_GATTS_CONNECT_EVT:
-        {
-            esp_ble_conn_update_params_t conn_params;
-            memset(&conn_params, 0, sizeof(conn_params));
-            conn_params.latency = 0;
-            conn_params.min_int = adv_params.adv_int_min;
-            conn_params.max_int = adv_params.adv_int_max;
-            conn_params.timeout = 1000;
-            memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
-
-            esp_ble_gap_update_conn_params(&conn_params);
-            connection_id = param->connect.conn_id;
-            break;
-        }
-
-        case ESP_GATTS_WRITE_EVT:
-            HandleWriteEvent(param->write);
-            break;
-
-        case ESP_GATTS_CONF_EVT:
-            if (param->conf.status == ESP_GATT_OK)
-                notification_in_progress = false;
+            AddConnection(param->connect.conn_id);
+            esp_ble_gap_start_advertising(&adv_params);
             break;
 
         case ESP_GATTS_DISCONNECT_EVT:
-            connection_id            = INVALID_CONN_ID;
-            notifications_enabled    = false;
-            notification_in_progress = false;
+            RemoveConnection(param->disconnect.conn_id);
             esp_ble_gap_start_advertising(&adv_params);
+            break;
+
+        case ESP_GATTS_WRITE_EVT:
+            HandleWriteEvent(param->write);
             break;
 
         default:
@@ -218,40 +213,86 @@ void BleManager::HandleWriteEvent(const esp_ble_gatts_cb_param_t::gatts_write_ev
     {
         if (write.len == 2)
         {
-            uint16_t ccc_value    = (write.value[1] << 8) | write.value[0];
-            notifications_enabled = (ccc_value == 0x0001);
+            uint16_t ccc_value = (write.value[1] << 8) | write.value[0];
+            for (int i = 0; i < MAX_CONNECTIONS; ++i)
+            {
+                if (connection_ids[i] == write.conn_id)
+                {
+                    notifications_enabled[i] = (ccc_value == 0x0001);
+                    break;
+                }
+            }
         }
     }
-    else if (write.len > 0)
+    else if (write.handle == notify_handle - 2)
     {
         std::string input(reinterpret_cast<const char *>(write.value), write.len);
         std::string response = commandManager.ProcessCommand(input);
-        SendNotification(response);
+        SendNotification(response, write.conn_id);
     }
 }
 
-void BleManager::SendNotification(const std::string &response)
+void BleManager::SendNotification(const std::string &response, uint16_t conn_id)
 {
-    if (connection_id == INVALID_CONN_ID || notify_handle == 0 || !notifications_enabled)
+    do
     {
-        return;
-    }
-
-    if (xSemaphoreTake(resource_mutex, portMAX_DELAY) == pdTRUE)
-    {
-        if (!notification_in_progress)
+        if (notify_handle == 0)
         {
-            notification_in_progress = true;
-            uint16_t len             = response.size();
-            uint8_t *data            = new uint8_t[len];
-            memcpy(data, response.c_str(), len);
-            esp_err_t ret = esp_ble_gatts_send_indicate(gatts_if_global, connection_id, notify_handle, len, data, false);
-            delete[] data;
-            if (ret != ESP_OK)
+            break;
+        }
+
+        if (xSemaphoreTake(resource_mutex, portMAX_DELAY) != pdTRUE)
+        {
+            break;
+        }
+
+        for (int i = 0; i < MAX_CONNECTIONS; ++i)
+        {
+            if (connection_ids[i] == conn_id && notifications_enabled[i])
             {
-                notification_in_progress = false;
+                uint16_t len  = response.size();
+                uint8_t *data = new uint8_t[len];
+                memcpy(data, response.c_str(), len);
+
+                esp_ble_gatts_send_indicate(gatts_if_global, conn_id, notify_handle, len, data, false);
+
+                delete[] data;
+                break;
             }
         }
         xSemaphoreGive(resource_mutex);
+    } while (0);
+}
+
+void BleManager::AddConnection(uint16_t conn_id)
+{
+    do
+    {
+        if (conn_id == INVALID_CONN_ID)
+        {
+            break;
+        }
+
+        for (int i = 0; i < MAX_CONNECTIONS; ++i)
+        {
+            if (connection_ids[i] == INVALID_CONN_ID)
+            {
+                connection_ids[i] = conn_id;
+                break;
+            }
+        }
+    } while (0);
+}
+
+void BleManager::RemoveConnection(uint16_t conn_id)
+{
+    for (int i = 0; i < MAX_CONNECTIONS; ++i)
+    {
+        if (connection_ids[i] == conn_id)
+        {
+            connection_ids[i]        = INVALID_CONN_ID;
+            notifications_enabled[i] = false;
+            break;
+        }
     }
 }
