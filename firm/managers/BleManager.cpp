@@ -3,7 +3,6 @@
 #include "esp_bt.h"
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
-#include "esp_log.h"
 #include <cstring>
 
 BleManager *BleManager::instance = nullptr;
