@@ -13,7 +13,7 @@ This project uses **ESP-IDF v5.3** for development.
    Alternatively, you can use the ESP-IDF PowerShell or bash environment.
 
 ## How to Build and Flash
-
+Inside the firm folder
 ### Build the Project
 To build the firmware, run:
 ```bash
