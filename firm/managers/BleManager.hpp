@@ -2,6 +2,7 @@
 #define BLE_MANAGER_HPP
 
 #include <string>
+#include <vector>
 #include "CommandManager.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -47,6 +48,14 @@ class BleManager
      * @param param Pointer to the event parameters.
      */
     void GATTSCallback(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+    /**
+     * @brief Verifies the integrity of received data using a Block Check Character (BCC).
+     *
+     * @param data The vector of bytes containing the data to validate.
+     * @return true If the data's checksum is valid.
+     * @return false If the data's checksum is invalid.
+     */
+    bool VerifyBCC(const std::vector<uint8_t> &data);
 
     /**
      * @brief Handles write events from BLE clients.
@@ -72,11 +81,10 @@ class BleManager
      */
     void RemoveConnection(uint16_t conn_id);
 
-    static BleManager *instance; ///< Singleton instance of the BLE Manager.
+    static BleManager *instance;
 
-    CommandManager commandManager; ///< Command manager for handling BLE commands.
+    CommandManager commandManager;
 
-    // UUIDs
     static const uint16_t SERVICE_UUID;
     static const uint16_t CHAR_UUID_WRITE;
     static const uint16_t CHAR_UUID_NOTIFY;
@@ -84,31 +92,28 @@ class BleManager
     static const uint16_t GATT_UUID_CHAR_DECLARE;
     static const uint16_t GATT_UUID_CHAR_CLIENT_CONFIG;
 
-    // BLE connection constants
     static const uint16_t INVALID_CONN_ID;
     static const uint8_t  PROFILE_APP_IDX;
     static const uint8_t  SVC_INST_ID;
 
-    // BLE characteristics properties
     static uint8_t char_prop_write;
     static uint8_t char_prop_notify;
 
-    // Maximum BLE connections
     static const int MAX_CONNECTIONS = 9;
-    static uint16_t  connection_ids[MAX_CONNECTIONS];        ///< List of connection IDs.
-    static bool      notifications_enabled[MAX_CONNECTIONS]; ///< List of notification statuses.
+    static uint16_t  connection_ids[MAX_CONNECTIONS];
+    static bool      notifications_enabled[MAX_CONNECTIONS];
 
-    // BLE advertising data and parameters
+    static std::vector<uint8_t> command_buffers[MAX_CONNECTIONS];
+
     static uint8_t              adv_data[];
     static esp_ble_adv_params_t adv_params;
 
-    // BLE GATT attributes
     static esp_gatts_attr_db_t gatt_db[];
 
-    uint16_t          notify_handle;            ///< Handle for notifications.
-    esp_gatt_if_t     gatts_if_global;          ///< Global GATT interface.
-    bool              notification_in_progress; ///< Indicates if a notification is in progress.
-    SemaphoreHandle_t resource_mutex;           ///< Mutex for protecting shared resources.
+    uint16_t          notify_handle;
+    esp_gatt_if_t     gatts_if_global;
+    bool              notification_in_progress;
+    SemaphoreHandle_t resource_mutex;
 };
 
 #endif // BLE_MANAGER_HPP

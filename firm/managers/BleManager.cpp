@@ -4,6 +4,7 @@
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
 #include <cstring>
+#include <vector>
 
 BleManager *BleManager::instance = nullptr;
 
@@ -21,8 +22,9 @@ const uint8_t  BleManager::SVC_INST_ID     = 0;
 uint8_t BleManager::char_prop_write  = ESP_GATT_CHAR_PROP_BIT_WRITE;
 uint8_t BleManager::char_prop_notify = ESP_GATT_CHAR_PROP_BIT_NOTIFY;
 
-uint16_t BleManager::connection_ids[MAX_CONNECTIONS]        = {BleManager::INVALID_CONN_ID};
-bool     BleManager::notifications_enabled[MAX_CONNECTIONS] = {false};
+uint16_t             BleManager::connection_ids[MAX_CONNECTIONS]        = {BleManager::INVALID_CONN_ID};
+bool                 BleManager::notifications_enabled[MAX_CONNECTIONS] = {false};
+std::vector<uint8_t> BleManager::command_buffers[MAX_CONNECTIONS];
 
 static uint8_t  char_value_write[128]  = {0};
 static uint8_t  char_value_notify[128] = {0};
@@ -205,6 +207,25 @@ void BleManager::GATTSCallback(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_i
             break;
     }
 }
+bool BleManager::VerifyBCC(const std::vector<uint8_t> &data)
+{
+    bool result = false;
+    do
+    {
+        if (data.empty())
+        {
+            break;
+        }
+        uint8_t bcc = 0;
+        for (size_t i = 0; i < data.size() - 1; ++i)
+        {
+            bcc ^= data[i];
+        }
+        result = (bcc == data.back());
+    } while (0);
+
+    return result;
+}
 
 void BleManager::HandleWriteEvent(const esp_ble_gatts_cb_param_t::gatts_write_evt_param &write)
 {
@@ -225,9 +246,39 @@ void BleManager::HandleWriteEvent(const esp_ble_gatts_cb_param_t::gatts_write_ev
     }
     else if (write.handle == notify_handle - 2)
     {
-        std::string input(reinterpret_cast<const char *>(write.value), write.len);
-        std::string response = commandManager.ProcessCommand(input);
-        SendNotification(response, write.conn_id);
+        for (int i = 0; i < MAX_CONNECTIONS; ++i)
+        {
+            if (connection_ids[i] == write.conn_id)
+            {
+                if (write.value[0] == 0x01)
+                {
+                    command_buffers[i].insert(command_buffers[i].end(), write.value + 1, write.value + write.len);
+                }
+                else if (write.value[0] == 0x00)
+                {
+                    command_buffers[i].insert(command_buffers[i].end(), write.value + 1, write.value + write.len);
+                    if (VerifyBCC(command_buffers[i]))
+                    {
+                        std::vector<uint8_t> command_data(command_buffers[i].begin(), command_buffers[i].end() - 1);
+                        std::string          response = commandManager.ProcessCommand(std::string(command_data.begin(), command_data.end()));
+                        SendNotification(response, write.conn_id);
+                    }
+                    else
+                    {
+                        SendNotification("Invalid BCC", write.conn_id);
+                    }
+
+                    command_buffers[i].clear();
+                }
+                else
+                {
+                    std::string input(reinterpret_cast<const char *>(write.value), write.len);
+                    std::string response = commandManager.ProcessCommand(input);
+                    SendNotification(response, write.conn_id);
+                }
+                break;
+            }
+        }
     }
 }
 
