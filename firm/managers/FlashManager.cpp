@@ -10,8 +10,8 @@ extern "C"
 #include "esp_log.h"
 }
 
-#define DATA_FILE "data.txt"
-
+#define DATA_FILE "flash.txt"
+static constexpr const char *MOUNT_POINT = "/spiffs";
 FlashManager::FlashManager()
 {
 }
@@ -29,7 +29,7 @@ bool FlashManager::Init()
     size_t total = 0, used = 0;
     ret = esp_spiffs_info(nullptr, &total, &used);
 
-    if (!createFile())
+    if (!CreateFile())
     {
         return false;
     }
@@ -37,7 +37,7 @@ bool FlashManager::Init()
     return true;
 }
 
-bool FlashManager::isHex(const std::string &s) const
+bool FlashManager::IsHex(const std::string &s) const
 {
     if (s.empty())
         return false;
@@ -66,7 +66,7 @@ std::string FlashManager::HandleCommand(const std::string &cmdIn)
         {
             if (cmd.size() <= 1)
             {
-                if (deleteFile() && createFile())
+                if (DeleteFile() && CreateFile())
                 {
                     code = "OK";
                     break;
@@ -75,12 +75,12 @@ std::string FlashManager::HandleCommand(const std::string &cmdIn)
                 break;
             }
             std::string keyHex = cmd.substr(1);
-            if (!isHex(keyHex))
+            if (!IsHex(keyHex))
             {
                 break;
             }
             long id = strtol(keyHex.c_str(), nullptr, 16);
-            if (deleteDataById(id))
+            if (DeleteDataById(id))
             {
                 code = "OK";
                 break;
@@ -90,7 +90,7 @@ std::string FlashManager::HandleCommand(const std::string &cmdIn)
         }
         if (cmd == "#")
         {
-            std::string all = readAllData();
+            std::string all = ReadAllData();
             if (all.empty())
             {
                 code = "OP_ERROR";
@@ -104,7 +104,7 @@ std::string FlashManager::HandleCommand(const std::string &cmdIn)
         {
             std::string hexPart  = cmd.substr(0, pos);
             std::string dataPart = cmd.substr(pos + 1);
-            if (!isHex(hexPart))
+            if (!IsHex(hexPart))
             {
                 break;
             }
@@ -113,7 +113,7 @@ std::string FlashManager::HandleCommand(const std::string &cmdIn)
                 break;
             }
             long id = strtol(hexPart.c_str(), nullptr, 16);
-            if (writeData(id, dataPart))
+            if (WriteData(id, dataPart))
             {
                 code = "OK";
                 break;
@@ -121,12 +121,12 @@ std::string FlashManager::HandleCommand(const std::string &cmdIn)
             code = "OP_ERROR";
             break;
         }
-        if (!isHex(cmd))
+        if (!IsHex(cmd))
         {
             break;
         }
         long        id    = strtol(cmd.c_str(), nullptr, 16);
-        std::string found = readDataById(id);
+        std::string found = ReadDataById(id);
         if (found.empty())
         {
             code = "OP_ERROR";
@@ -137,7 +137,7 @@ std::string FlashManager::HandleCommand(const std::string &cmdIn)
     return code;
 }
 
-bool FlashManager::writeData(long id, const std::string &data)
+bool FlashManager::WriteData(long id, const std::string &data)
 {
     FILE *f = fopen((std::string(MOUNT_POINT) + "/" + DATA_FILE).c_str(), "r");
     if (!f)
@@ -191,7 +191,7 @@ bool FlashManager::writeData(long id, const std::string &data)
     return true;
 }
 
-std::string FlashManager::readAllData() const
+std::string FlashManager::ReadAllData() const
 {
     FILE *f = fopen((std::string(MOUNT_POINT) + "/" + DATA_FILE).c_str(), "r");
     if (!f)
@@ -224,7 +224,7 @@ std::string FlashManager::readAllData() const
     return result;
 }
 
-std::string FlashManager::readDataById(long id) const
+std::string FlashManager::ReadDataById(long id) const
 {
     FILE *f = fopen((std::string(MOUNT_POINT) + "/" + DATA_FILE).c_str(), "r");
     if (!f)
@@ -262,7 +262,7 @@ std::string FlashManager::readDataById(long id) const
     return found;
 }
 
-bool FlashManager::deleteFile()
+bool FlashManager::DeleteFile()
 {
     std::string filePath = std::string(MOUNT_POINT) + "/" + DATA_FILE;
     if (remove(filePath.c_str()) == 0)
@@ -275,7 +275,7 @@ bool FlashManager::deleteFile()
     }
 }
 
-bool FlashManager::createFile()
+bool FlashManager::CreateFile()
 {
     std::string filePath = std::string(MOUNT_POINT) + "/" + DATA_FILE;
     FILE       *f        = fopen(filePath.c_str(), "r");
@@ -294,7 +294,7 @@ bool FlashManager::createFile()
     }
     return true;
 }
-bool FlashManager::deleteDataById(long id)
+bool FlashManager::DeleteDataById(long id)
 {
     FILE *f = fopen((std::string(MOUNT_POINT) + "/" + DATA_FILE).c_str(), "r");
     if (!f)

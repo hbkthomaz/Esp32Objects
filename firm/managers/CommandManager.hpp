@@ -34,6 +34,7 @@ class CommandManager
      * @return Result code after processing the test command.
      */
     std::string CommandTests(const std::string &cmd);
+    std::string CommandCryptoSet(const std::string &cmd);
 };
 
 #endif // COMMAND_MANAGER_HPP

@@ -1,0 +1,15 @@
+[ req ]
+default_bits        = 1024
+prompt              = no
+default_md          = sha256
+distinguished_name  = dn
+req_extensions      = req_ext
+
+[ dn ]
+CN=SomeCN
+O=IndustrySA
+ST=SomeState
+C=BR
+
+[ req_ext ]
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
