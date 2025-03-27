@@ -1,3 +1,9 @@
 firm/build/*
 .vscode/settings.json
 *.old
+*.der
+*.key
+*.srl
+*.sig
+*.bin
+test/Crypto/DEVICE/*

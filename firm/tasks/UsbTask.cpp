@@ -2,8 +2,10 @@
 #include "driver/uart.h"
 #include "CommandManager.hpp"
 #include <string>
+#include <cstring>
+#include <stdlib.h>
 
-#define BUF_SIZE (1024)
+#define BUF_SIZE (8192)
 #define UART_NUM UART_NUM_0
 
 CommandManager commandManagerUsb;
@@ -24,7 +26,6 @@ void UsbTaskCreate()
     esp_err_t err = uart_param_config(UART_NUM, &uart_config);
     if (err != ESP_OK)
     {
-        printf("Failed to configure UART parameters: %s\n", esp_err_to_name(err));
         return;
     }
 
@@ -35,7 +36,7 @@ void UsbTaskCreate()
         return;
     }
 
-    if (xTaskCreate(UsbTask, "UsbTask", 4096, &uartQueue, 10, NULL) != pdPASS)
+    if (xTaskCreate(UsbTask, "UsbTask", 16384, &uartQueue, 5, NULL) != pdPASS)
     {
         uart_driver_delete(UART_NUM);
     }
@@ -45,20 +46,31 @@ static void UsbTask(void *param)
 {
     if (param == NULL)
     {
-        printf("Error: UART queue handle is NULL\n");
         vTaskDelete(NULL);
     }
 
     QueueHandle_t queue = *(QueueHandle_t *)param;
     if (queue == NULL)
     {
-        printf("Error: Invalid UART queue handle\n");
         vTaskDelete(NULL);
     }
 
     uart_event_t event;
-    std::string  inputString;
-    uint8_t      data[BUF_SIZE];
+    char        *inputBuffer = (char *)malloc(BUF_SIZE);
+    if (inputBuffer == NULL)
+    {
+        vTaskDelete(NULL);
+    }
+    memset(inputBuffer, 0, BUF_SIZE);
+    size_t inputIndex = 0;
+
+    uint8_t *data = (uint8_t *)malloc(BUF_SIZE);
+    if (data == NULL)
+    {
+        free(inputBuffer);
+        vTaskDelete(NULL);
+    }
+
     commandManagerUsb.Init();
 
     while (true)
@@ -72,20 +84,33 @@ static void UsbTask(void *param)
                 {
                     for (int i = 0; i < len; i++)
                     {
-                        char inChar = (char)data[i];
+                        char inChar = static_cast<char>(data[i]);
                         if (inChar == '\n')
                         {
-                            std::string code = commandManagerUsb.ProcessCommand(inputString);
-                            printf("%s\n", code.c_str());
-                            inputString.clear();
+                            inputBuffer[inputIndex] = '\0';
+                            std::string command(inputBuffer);
+                            std::string response = commandManagerUsb.ProcessCommand(command);
+                            printf("%s\n", response.c_str());
+                            inputIndex = 0;
                         }
                         else
                         {
-                            inputString.push_back(inChar);
+                            if (inputIndex < BUF_SIZE - 1)
+                            {
+                                inputBuffer[inputIndex++] = inChar;
+                            }
+                            else
+                            {
+                                inputIndex = 0;
+                            }
                         }
                     }
+                    vTaskDelay(pdMS_TO_TICKS(1));
                 }
             }
         }
     }
+    free(data);
+    free(inputBuffer);
+    vTaskDelete(NULL);
 }

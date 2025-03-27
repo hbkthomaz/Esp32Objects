@@ -1,170 +1,211 @@
 #!/bin/bash
 
-usage() {
-    echo "Uso: $0 <hardware id>"
+Usage() {
+    echo "Usage:"
+    echo "  $0 --all --deviceId <deviceId>   : Generate CA, API, and DEVICE certificates"
+    echo "  $0 --deviceId <deviceId>         : Generate only DEVICE certificate (requires existing CA/API)"
     exit 1
 }
 
-if [ "$#" -lt 1 ]; then
-    usage
+# Default flags
+doAll=false
+deviceId=""
+
+# Parse parameters
+if [ $# -eq 0 ]; then
+    Usage
 fi
 
-hardware_id=$1
-name="DEVICE"
-ca_dir="CA"
-api_dir="API"
-conf_folder="CertificatesConf"
-test_dir="TestData/$hardware_id"
+if [ "$1" == "--all" ]; then
+    doAll=true
+    shift
+fi
 
-create_ca() {
-    echo "Criando diretório da CA..."
-    mkdir -p "$ca_dir"
-
-    echo "Gerando chave privada da CA em DER..."
-    openssl genrsa -out "$ca_dir/${ca_dir}_key_priv.pem" 1024
-    if [ $? -ne 0 ]; then
-        echo "Erro ao gerar a chave privada da CA."
-        exit 1
-    fi
-    openssl rsa -in "$ca_dir/${ca_dir}_key_priv.pem" -outform der -out "$ca_dir/${ca_dir}_key_priv.der"
-    rm "$ca_dir/${ca_dir}_key_priv.pem"
-
-    echo "Gerando certificado da CA em DER..."
-    openssl req -new -x509 -days 3650 -key "$ca_dir/${ca_dir}_key_priv.der" -out "$ca_dir/${ca_dir}.pem" -config "$conf_folder/ca_openssl.cnf"
-    if [ $? -ne 0 ]; then
-        echo "Erro ao gerar o certificado da CA."
-        exit 1
-    fi
-    openssl x509 -in "$ca_dir/${ca_dir}.pem" -outform der -out "$ca_dir/${ca_dir}.der"
-    rm "$ca_dir/${ca_dir}.pem"
-
-    echo "Certificado da CA criado com sucesso em formato DER."
-}
-
-create_api() {
-    echo "Criando diretório da API..."
-    mkdir -p "$api_dir"
-
-    echo "Gerando chave privada da API em DER..."
-    openssl genrsa -out "$api_dir/api_private_key.pem" 1024
-    if [ $? -ne 0 ]; then
-        echo "Erro ao gerar a chave privada da API."
-        exit 1
-    fi
-    openssl rsa -in "$api_dir/api_private_key.pem" -outform der -out "$api_dir/api_private_key.der"
-    rm "$api_dir/api_private_key.pem"
-
-    echo "Gerando CSR da API..."
-    openssl req -new -key "$api_dir/api_private_key.der" -out "$api_dir/${api_dir}.csr" -config "$conf_folder/${api_dir}_openssl.cnf"
-    if [ $? -ne 0 ]; then
-        echo "Erro ao gerar o CSR da API."
-        exit 1
-    fi
-    openssl req -in "$api_dir/${api_dir}.csr" -outform der -out "$api_dir/${api_dir}_csr.der"
-    rm "$api_dir/${api_dir}.csr"
-
-    echo "Assinando o certificado da API com a CA em DER..."
-    openssl x509 -req -in "$api_dir/${api_dir}_csr.der" -CA "$ca_dir/${ca_dir}.der" -CAkey "$ca_dir/${ca_dir}_key_priv.der" -CAcreateserial -out "$api_dir/${api_dir}.der" -days 3650 -sha256 -extfile "$conf_folder/${api_dir}_openssl.cnf" -extensions v3_ca
-    if [ $? -ne 0 ]; then
-        echo "Erro ao assinar o certificado da API."
-        exit 1
-    fi
-
-    echo "Certificado da API criado com sucesso em formato DER."
-}
-
-if [ ! -f "$ca_dir/${ca_dir}.der" ] || [ ! -f "$ca_dir/${ca_dir}_key_priv.der" ]; then
-    echo "Certificado ou chave privada da CA não encontrado."
-    create_ca
+if [ "$1" == "--deviceId" ]; then
+    shift
+    deviceId=$1
+    shift
 else
-    echo "Certificado da CA encontrado."
+    Usage
 fi
 
-if [ ! -f "$api_dir/${api_dir}.der" ] || [ ! -f "$api_dir/api_private_key.der" ]; then
-    echo "Certificado ou chave privada da API não encontrado."
-    create_api
+if [ -z "$deviceId" ]; then
+    echo "Error: deviceId not specified."
+    Usage
+fi
+
+# Variables
+caDir="CA"
+apiDir="API"
+deviceName="DEVICE"
+confFolder="CertificatesConf"
+testDir="TestData/$deviceId"
+
+CreateCA() {
+    echo "Creating CA directory..."
+    mkdir -p "$caDir"
+
+    echo "Generating CA private key in DER format..."
+    openssl genrsa -out "$caDir/${caDir}_key_priv.pem" 1024
+    if [ $? -ne 0 ]; then
+        echo "Error generating the CA private key."
+        exit 1
+    fi
+    openssl rsa -in "$caDir/${caDir}_key_priv.pem" -outform der -out "$caDir/${caDir}_key_priv.der"
+    rm "$caDir/${caDir}_key_priv.pem"
+
+    echo "Generating CA certificate in DER format..."
+    openssl req -new -x509 -days 3650 -key "$caDir/${caDir}_key_priv.der" -out "$caDir/${caDir}.pem" -config "$confFolder/ca_openssl.cnf"
+    if [ $? -ne 0 ]; then
+        echo "Error generating the CA certificate."
+        exit 1
+    fi
+    openssl x509 -in "$caDir/${caDir}.pem" -outform der -out "$caDir/${caDir}.der"
+    rm "$caDir/${caDir}.pem"
+
+    echo "Successfully generated CA certificate in DER format."
+}
+
+CreateAPI() {
+    echo "Creating API directory..."
+    mkdir -p "$apiDir"
+
+    echo "Generating API private key in DER format..."
+    openssl genrsa -out "$apiDir/api_private_key.pem" 1024
+    if [ $? -ne 0 ]; then
+        echo "Error generating the API private key."
+        exit 1
+    fi
+    openssl rsa -in "$apiDir/api_private_key.pem" -outform der -out "$apiDir/api_private_key.der"
+    rm "$apiDir/api_private_key.pem"
+
+    echo "Generating API CSR..."
+    openssl req -new -key "$apiDir/api_private_key.der" -out "$apiDir/${apiDir}.csr" -config "$confFolder/${apiDir}_openssl.cnf"
+    if [ $? -ne 0 ]; then
+        echo "Error generating the API CSR."
+        exit 1
+    fi
+    openssl req -in "$apiDir/${apiDir}.csr" -outform der -out "$apiDir/${apiDir}_csr.der"
+    rm "$apiDir/${apiDir}.csr"
+
+    echo "Signing the API certificate with the CA in DER format..."
+    openssl x509 -req -in "$apiDir/${apiDir}_csr.der" -CA "$caDir/${caDir}.der" -CAkey "$caDir/${caDir}_key_priv.der" -CAcreateserial -out "$apiDir/${apiDir}.der" -days 3650 -sha256 -extfile "$confFolder/${apiDir}_openssl.cnf" -extensions v3_ca
+    if [ $? -ne 0 ]; then
+        echo "Error signing the API certificate."
+        exit 1
+    fi
+
+    echo "Successfully generated API certificate in DER format."
+}
+
+CreateDevice() {
+    # Make sure DEVICE directory exists
+    if [ ! -d "$deviceName" ]; then
+        mkdir "$deviceName"
+    fi
+
+    # Remove existing folder for this deviceId if it exists
+    if [ -d "$deviceName/$deviceId" ]; then
+        rm -rf "$deviceName/$deviceId"
+    fi
+
+    mkdir "$deviceName/$deviceId"
+
+    templateFile="$confFolder/${deviceName}_template_openssl.cnf"
+    outputFile="$deviceName/$deviceId/${deviceName}_openssl.cnf"
+
+    if [ ! -f "$templateFile" ]; then
+        echo "Error: Template file '$templateFile' not found."
+        exit 1
+    fi
+
+    # Replace placeholder in template
+    sed "s/CN = XXXXXXXXXX/CN = $deviceId/" "$templateFile" > "$outputFile"
+    echo "Configuration file generated: $outputFile"
+
+    echo "Processing $deviceName in folder $deviceName/$deviceId..."
+
+    # Generate private key (PEM), then convert to DER
+    openssl genrsa -out "$deviceName/$deviceId/${deviceName}_private_key.pem" 1024
+    if [ $? -ne 0 ]; then
+        echo "Error generating RSA private key."
+        exit 1
+    fi
+    openssl rsa -in "$deviceName/$deviceId/${deviceName}_private_key.pem" -outform der -out "$deviceName/$deviceId/${deviceName}_private_key.der"
+
+    # Extract public key in DER
+    openssl rsa -in "$deviceName/$deviceId/${deviceName}_private_key.der" -pubout -outform der -out "$deviceName/$deviceId/${deviceName}_key_pub.der"
+
+    # Generate CSR (PEM), convert to DER
+    openssl req -new -key "$deviceName/$deviceId/${deviceName}_private_key.pem" -out "$deviceName/$deviceId/${deviceName}.csr" -config "$outputFile"
+    if [ $? -ne 0 ]; then
+        echo "Error generating the device CSR."
+        exit 1
+    fi
+    openssl req -in "$deviceName/$deviceId/${deviceName}.csr" -outform der -out "$deviceName/$deviceId/${deviceName}_csr.der"
+    rm "$deviceName/$deviceId/${deviceName}.csr"
+
+    # Sign device certificate
+    openssl x509 -req -in "$deviceName/$deviceId/${deviceName}_csr.der" -CA "$caDir/${caDir}.der" -CAkey "$caDir/${caDir}_key_priv.der" -CAcreateserial -out "$deviceName/$deviceId/${deviceName}.crt" -days 1000 -sha256 -extfile "$outputFile" -extensions v3_ca
+    if [ $? -ne 0 ]; then
+        echo "Error signing the device certificate."
+        exit 1
+    fi
+
+    # Convert device certificate to DER
+    openssl x509 -in "$deviceName/$deviceId/${deviceName}.crt" -outform der -out "$deviceName/$deviceId/${deviceName}.der"
+    rm "$deviceName/$deviceId/${deviceName}.crt"
+
+    # Generate a new CSR for demonstration, in DER format
+    openssl req -new -key "$deviceName/$deviceId/${deviceName}_private_key.pem" -out "$deviceName/$deviceId/csr.pem" -config "$confFolder/csr.cnf"
+    if [ $? -ne 0 ]; then
+        echo "Error generating the new CSR with PEM key."
+        exit 1
+    fi
+    openssl req -in "$deviceName/$deviceId/csr.pem" -outform der -out "$deviceName/$deviceId/csr.der"
+    rm "$deviceName/$deviceId/csr.pem"
+
+    echo "$deviceName successfully processed in DER format."
+
+    # Generate test signatures
+    echo "Generating signatures for testing..."
+    mkdir -p "$testDir"
+
+    buffer="a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0a1b2c3d4e5f60718"
+    echo "$buffer" | xxd -r -p > "$testDir/buffer.bin"
+
+    openssl pkeyutl -encrypt -in "$testDir/buffer.bin" -pubin -inkey "$deviceName/$deviceId/${deviceName}_key_pub.der" -out "$testDir/buffer_encrypted.der"
+    if [ $? -ne 0 ]; then
+        echo "Error encrypting the buffer."
+        exit 1
+    fi
+
+    openssl dgst -sha256 -sign "$apiDir/api_private_key.der" -out "$testDir/buffer_encrypted_api.sig" "$testDir/buffer_encrypted.der"
+    if [ $? -ne 0 ]; then
+        echo "Error signing the buffer with the API key."
+        exit 1
+    fi
+
+    echo "Test signatures successfully generated in DER format."
+    echo "Done."
+}
+
+if [ "$doAll" = true ]; then
+    echo "Running full generation (CA, API, DEVICE)..."
+    CreateCA
+    CreateAPI
+    CreateDevice
 else
-    echo "Certificado da API encontrado."
+    echo "Generating only DEVICE certificate. Existing CA and API are required."
+    # Check for CA
+    if [ ! -f "$caDir/${caDir}.der" ] || [ ! -f "$caDir/${caDir}_key_priv.der" ]; then
+        echo "Error: CA certificate or private key not found. Please run with '--all --deviceId <deviceId>' first."
+        exit 1
+    fi
+    # Check for API
+    if [ ! -f "$apiDir/${apiDir}.der" ] || [ ! -f "$apiDir/api_private_key.der" ]; then
+        echo "Error: API certificate or private key not found. Please run with '--all --deviceId <deviceId>' first."
+        exit 1
+    fi
+    CreateDevice
 fi
-
-if [ ! -d "$name" ]; then
-    mkdir "$name"
-fi
-
-if [ -d "$name/$hardware_id" ]; then
-    rm -rf "$name/$hardware_id"
-fi
-
-mkdir "$name/$hardware_id"
-
-template_file="$conf_folder/${name}_template_openssl.cnf"
-output_file="$name/$hardware_id/${name}_openssl.cnf"
-
-if [ ! -f "$template_file" ]; then
-    echo "Erro: O arquivo de template '$template_file' não foi encontrado."
-    exit 1
-fi
-
-sed "s/CN = XXXXXXXXXX/CN = $hardware_id/" "$template_file" > "$output_file"
-
-echo "Arquivo de configuração gerado: $output_file"
-
-echo "Processando $name na pasta $name/$hardware_id..."
-
-openssl genrsa -out "$name/$hardware_id/${name}_private_key.pem" 1024
-if [ $? -ne 0 ]; then
-    echo "Erro ao gerar a chave RSA."
-    exit 1
-fi
-openssl rsa -in "$name/$hardware_id/${name}_private_key.pem" -outform der -out "$name/$hardware_id/${name}_private_key.der"
-
-openssl rsa -in "$name/$hardware_id/${name}_private_key.der" -pubout -outform der -out "$name/$hardware_id/${name}_key_pub.der"
-
-openssl req -new -key "$name/$hardware_id/${name}_private_key.pem" -out "$name/$hardware_id/${name}.csr" -config "$output_file"
-if [ $? -ne 0 ]; then
-    echo "Erro ao gerar o CSR do dispositivo."
-    exit 1
-fi
-openssl req -in "$name/$hardware_id/${name}.csr" -outform der -out "$name/$hardware_id/${name}_csr.der"
-rm "$name/$hardware_id/${name}.csr"
-
-openssl x509 -req -in "$name/$hardware_id/${name}_csr.der" -CA "$ca_dir/${ca_dir}.der" -CAkey "$ca_dir/${ca_dir}_key_priv.der" -CAcreateserial -out "$name/$hardware_id/${name}.crt" -days 1000 -sha256 -extfile "$output_file" -extensions v3_ca
-if [ $? -ne 0 ]; then
-    echo "Erro ao assinar o certificado do dispositivo."
-    exit 1
-fi
-
-openssl x509 -in "$name/$hardware_id/${name}.crt" -outform der -out "$name/$hardware_id/${name}.der"
-rm "$name/$hardware_id/${name}.crt"
-
-openssl req -new -key "$name/$hardware_id/${name}_private_key.pem" -out "$name/$hardware_id/csr.pem" -config "$conf_folder/csr.cnf"
-if [ $? -ne 0 ]; then
-    echo "Erro ao gerar a nova CSR com a chave PEM."
-    exit 1
-fi
-openssl req -in "$name/$hardware_id/csr.pem" -outform der -out "$name/$hardware_id/csr.der"
-rm "$name/$hardware_id/csr.pem"
-
-echo "$name processado com sucesso em formato DER."
-
-echo "Gerando assinaturas para teste..."
-
-mkdir -p "$test_dir"
-
-buffer="a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0a1b2c3d4e5f60718"
-
-echo "$buffer" | xxd -r -p > "$test_dir/buffer.bin"
-
-openssl pkeyutl -encrypt -in "$test_dir/buffer.bin" -pubin -inkey "$name/$hardware_id/${name}_key_pub.der" -out "$test_dir/buffer_encrypted.der"
-if [ $? -ne 0 ]; then
-    echo "Erro ao encriptar o buffer."
-    exit 1
-fi
-
-openssl dgst -sha256 -sign "$api_dir/api_private_key.der" -out "$test_dir/buffer_encrypted_api.sig" "$test_dir/buffer_encrypted.der"
-if [ $? -ne 0 ]; then
-    echo "Erro ao assinar o buffer com a chave da API."
-    exit 1
-fi
-
-echo "Assinaturas para teste geradas com sucesso em formato DER."

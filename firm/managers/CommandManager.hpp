@@ -5,36 +5,56 @@
 
 /**
  * @class CommandManager
- * @brief Handles command processing and execution.
+ * @brief Routes command strings and triggers the appropriate handlers.
  */
 class CommandManager
 {
   public:
     /**
-     * @brief Default constructor.
+     * @brief Constructs a CommandManager.
      */
     CommandManager();
 
     /**
-     * @brief Initializes the CommandManager.
+     * @brief Performs setup procedures (e.g., flash initialization).
      */
     void Init();
 
     /**
-     * @brief Processes a command string.
-     * @param cmdOriginal Original command string.
-     * @return Result code after processing the command.
+     * @brief Parses and executes a given command string.
+     * @param cmdOriginal The unprocessed command.
+     * @return A string result code or "SYNTAX_ERROR".
      */
     std::string ProcessCommand(const std::string &cmdOriginal);
 
   private:
     /**
-     * @brief Processes test-related commands.
-     * @param cmd Command string.
-     * @return Result code after processing the test command.
+     * @brief Handles test-related commands.
+     * @param cmd Subcommand string.
+     * @return A string result code or "SYNTAX_ERROR".
      */
     std::string CommandTests(const std::string &cmd);
+
+    /**
+     * @brief Handles certificate/key storage and related operations.
+     * @param cmd Subcommand string.
+     * @return A string result code or "SYNTAX_ERROR".
+     */
     std::string CommandCryptoSet(const std::string &cmd);
+
+    /**
+     * @brief Retrieves stored certificates or keys in hex format.
+     * @param cmd Subcommand string.
+     * @return Hex data or "SYNTAX_ERROR".
+     */
+    std::string CommandCryptoGet(const std::string &cmd);
+
+    /**
+     * @brief Converts a hex string to its byte representation.
+     * @param hex Input hex string.
+     * @return Corresponding byte sequence, or empty on failure.
+     */
+    std::string HexToBytes(const std::string &hex);
 };
 
 #endif // COMMAND_MANAGER_HPP

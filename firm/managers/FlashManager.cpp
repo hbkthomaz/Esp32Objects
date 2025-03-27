@@ -7,7 +7,6 @@ extern "C"
 {
 #include "esp_err.h"
 #include "esp_spiffs.h"
-#include "esp_log.h"
 }
 
 #define DATA_FILE "flash.txt"
@@ -18,7 +17,7 @@ FlashManager::FlashManager()
 
 bool FlashManager::Init()
 {
-    esp_vfs_spiffs_conf_t conf = {.base_path = MOUNT_POINT, .partition_label = nullptr, .max_files = 5, .format_if_mount_failed = true};
+    esp_vfs_spiffs_conf_t conf = {.base_path = MOUNT_POINT, .partition_label = nullptr, .max_files = 10, .format_if_mount_failed = true};
 
     esp_err_t ret = esp_vfs_spiffs_register(&conf);
     if (ret != ESP_OK)
