@@ -9,20 +9,12 @@
 #include <vector>
 #include <string>
 
-static std::string GetMbedtlsError(int ret)
-{
-    char errorBuf[128];
-    mbedtls_strerror(ret, errorBuf, sizeof(errorBuf));
-    return std::string(errorBuf);
-}
-
 CryptoOperations::CryptoOperations()
 {
     mbedtls_entropy_init(&entropyContext);
     mbedtls_ctr_drbg_init(&ctrDrbgContext);
     const char *pers = "crypto_ops";
-    int         ret =
-        mbedtls_ctr_drbg_seed(&ctrDrbgContext, mbedtls_entropy_func, &entropyContext, reinterpret_cast<const unsigned char *>(pers), strlen(pers));
+    mbedtls_ctr_drbg_seed(&ctrDrbgContext, mbedtls_entropy_func, &entropyContext, reinterpret_cast<const unsigned char *>(pers), strlen(pers));
 }
 
 CryptoOperations::~CryptoOperations()
