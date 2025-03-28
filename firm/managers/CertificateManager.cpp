@@ -7,44 +7,6 @@
 #include "mbedtls/rsa.h"
 #include "mbedtls/error.h"
 
-static std::string GetMbedtlsError(int ret)
-{
-    char errorBuf[128];
-    mbedtls_strerror(ret, errorBuf, sizeof(errorBuf));
-    return std::string(errorBuf);
-}
-
-static std::string NormalizeLineEndings(const std::string &str)
-{
-    std::string out = str;
-    size_t      pos = 0;
-    while ((pos = out.find("\r\n", pos)) != std::string::npos)
-    {
-        out.replace(pos, 2, "\n");
-    }
-    pos = 0;
-    while ((pos = out.find('\r', pos)) != std::string::npos)
-    {
-        out[pos] = '\n';
-    }
-    return out;
-}
-
-static void TrimString(std::string &s)
-{
-    const std::string whitespace = " \n\r\t";
-    size_t            start      = s.find_first_not_of(whitespace);
-    if (start != std::string::npos)
-    {
-        s = s.substr(start);
-    }
-    size_t end = s.find_last_not_of(whitespace);
-    if (end != std::string::npos)
-    {
-        s = s.substr(0, end + 1);
-    }
-}
-
 CertificateManager::CertificateManager()
 {
 }
