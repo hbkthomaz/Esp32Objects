@@ -5,7 +5,6 @@
 
 KeyStorageManager::KeyStorageManager()
 {
-    // Initialization if needed (e.g. mounting SPIFFS).
 }
 
 bool KeyStorageManager::StoreCertificate(const std::string &fileName, const std::string &certData)

@@ -6,17 +6,17 @@
 
 CryptoManager::CryptoManager() : mountPoint("/spiffs")
 {
-    // Initialization if needed.
+
 }
 
 std::string CryptoManager::GetFilePath(const std::string &fileName)
 {
-    return mountPoint + "/" + fileName;
+    std::string fullPath = mountPoint + "/" + fileName;
+    return fullPath;
 }
 
 std::string CryptoManager::SetCertificate(CertificateId id, const std::string &certData)
 {
-    // Validate certificate size.
     if (certData.size() < 100 || certData.size() > 4096)
     {
         return "INVALID_CERTIFICATE_SIZE";
@@ -38,7 +38,6 @@ std::string CryptoManager::SetCertificate(CertificateId id, const std::string &c
             return "INVALID_CERTIFICATE_ID";
     }
 
-    // For DEVICE and API, verify certificate signature against stored CA certificate.
     if (id == DEVICE || id == API)
     {
         std::string caFilePath = GetFilePath("ca.crt");
@@ -53,7 +52,6 @@ std::string CryptoManager::SetCertificate(CertificateId id, const std::string &c
         }
     }
 
-    // For DEVICE certificate, also verify that certificate matches the stored RSA key.
     if (id == DEVICE)
     {
         std::string keyFilePath = GetFilePath("device.key");
@@ -68,7 +66,6 @@ std::string CryptoManager::SetCertificate(CertificateId id, const std::string &c
         }
     }
 
-    // Store the certificate.
     std::string filePath = GetFilePath(fileName);
     bool        stored   = keyStorageManager.StoreCertificate(filePath, certData);
     if (!stored)
@@ -101,7 +98,6 @@ std::string CryptoManager::GetCertificate(CertificateId id)
     {
         return "OP_ERROR";
     }
-    // Convert certificate to hex representation.
     std::string hexDisplay;
     hexDisplay.reserve(certData.size() * 2);
     for (unsigned char ch : certData)
@@ -179,7 +175,6 @@ std::string CryptoManager::GetStoredCertsAndKeys()
 
 bool CryptoManager::SignData(const std::vector<uint8_t> &data, std::vector<uint8_t> &signature)
 {
-    // Load the device private key.
     std::string filePath = GetFilePath("device.key");
     std::string keyData  = keyStorageManager.LoadKey(filePath);
     if (keyData.empty())
@@ -201,7 +196,6 @@ bool CryptoManager::EncryptWithPublicKey(const std::string &publicKeyData, const
 
 bool CryptoManager::DecryptWithPrivateKey(const std::vector<uint8_t> &encrypted, std::vector<uint8_t> &decrypted)
 {
-    // Load the device private key.
     std::string filePath = GetFilePath("device.key");
     std::string keyData  = keyStorageManager.LoadKey(filePath);
     if (keyData.empty())

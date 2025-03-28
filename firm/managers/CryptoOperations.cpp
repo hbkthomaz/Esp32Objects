@@ -23,10 +23,6 @@ CryptoOperations::CryptoOperations()
     const char *pers = "crypto_ops";
     int         ret =
         mbedtls_ctr_drbg_seed(&ctrDrbgContext, mbedtls_entropy_func, &entropyContext, reinterpret_cast<const unsigned char *>(pers), strlen(pers));
-    if (ret != 0)
-    {
-        // Handle error as needed.
-    }
 }
 
 CryptoOperations::~CryptoOperations()
@@ -47,7 +43,6 @@ bool CryptoOperations::SignData(const std::string &privateKeyData, const std::ve
         return false;
     }
 
-    // Compute SHA-256 hash of the input data.
     unsigned char            hash[32] = {0};
     const mbedtls_md_info_t *mdInfo   = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
     if (!mdInfo)
@@ -61,9 +56,13 @@ bool CryptoOperations::SignData(const std::string &privateKeyData, const std::ve
         mbedtls_pk_free(&pk);
         return false;
     }
-
+    char hashHex[65] = {0};
+    for (int i = 0; i < 32; i++)
+    {
+        sprintf(hashHex + i * 2, "%02X", hash[i]);
+    }
     size_t sigLen = 0;
-    signatureOut.resize(512); // Allocate enough space based on key size.
+    signatureOut.resize(512);
     ret =
         mbedtls_pk_sign(&pk, MBEDTLS_MD_SHA256, hash, 0, signatureOut.data(), signatureOut.size(), &sigLen, mbedtls_ctr_drbg_random, &ctrDrbgContext);
     if (ret != 0)
@@ -71,7 +70,6 @@ bool CryptoOperations::SignData(const std::string &privateKeyData, const std::ve
         mbedtls_pk_free(&pk);
         return false;
     }
-
     signatureOut.resize(sigLen);
     mbedtls_pk_free(&pk);
     return true;
@@ -81,7 +79,7 @@ bool CryptoOperations::VerifySignature(const std::string &publicKeyData, const s
 {
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
-    int ret = mbedtls_pk_parse_public_key(&pk, reinterpret_cast<const unsigned char *>(publicKeyData.data()), publicKeyData.size());
+    int ret = mbedtls_pk_parse_public_key(&pk, reinterpret_cast<const unsigned char *>(publicKeyData.c_str()), publicKeyData.size() + 1);
     if (ret != 0)
     {
         mbedtls_pk_free(&pk);
@@ -101,7 +99,18 @@ bool CryptoOperations::VerifySignature(const std::string &publicKeyData, const s
         mbedtls_pk_free(&pk);
         return false;
     }
-
+    char hashHex[65] = {0};
+    for (int i = 0; i < 32; i++)
+    {
+        sprintf(hashHex + i * 2, "%02X", hash[i]);
+    }
+    std::string sigHex;
+    for (size_t i = 0; i < signature.size(); i++)
+    {
+        char buf[3] = {0};
+        sprintf(buf, "%02X", signature[i]);
+        sigHex += buf;
+    }
     ret = mbedtls_pk_verify(&pk, MBEDTLS_MD_SHA256, hash, 0, signature.data(), signature.size());
     mbedtls_pk_free(&pk);
     return (ret == 0);
@@ -172,6 +181,13 @@ bool CryptoOperations::DecryptWithPrivateKey(const std::string &privateKeyData, 
         return false;
     }
     decryptedOut.resize(olen);
+    std::string decryptedHex;
+    for (size_t i = 0; i < decryptedOut.size(); i++)
+    {
+        char buf[3] = {0};
+        sprintf(buf, "%02X", decryptedOut[i]);
+        decryptedHex += buf;
+    }
     mbedtls_pk_free(&pk);
     return true;
 }

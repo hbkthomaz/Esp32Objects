@@ -4,9 +4,64 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cstdint>
+#include "mbedtls/x509_crt.h"
+#include "mbedtls/pk.h"
+#include "mbedtls/error.h"
 
 static FlashManager  flashManager;
 static CryptoManager cryptoManager;
+
+/**
+ * @brief Helper function to load the API certificate and extract its public key.
+ * @return The API public key in PEM format or an empty string on failure.
+ */
+static std::string GetAPIPublicKey()
+{
+    const std::string filePath = "/spiffs/api.crt";
+    FILE             *file     = fopen(filePath.c_str(), "rb");
+    if (!file)
+    {
+        return "OP_ERROR";
+    }
+    fseek(file, 0, SEEK_END);
+    long fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    std::string certData;
+    certData.resize(fileSize);
+    size_t readBytes = fread(&certData[0], 1, fileSize, file);
+    fclose(file);
+    if (readBytes != static_cast<size_t>(fileSize))
+    {
+        return "OP_ERROR";
+    }
+
+    if (certData.find("-----BEGIN") != std::string::npos)
+    {
+        if (certData.back() != '\0')
+        {
+            certData.push_back('\0');
+        }
+    }
+
+    mbedtls_x509_crt cert;
+    mbedtls_x509_crt_init(&cert);
+    int ret = mbedtls_x509_crt_parse(&cert, reinterpret_cast<const unsigned char *>(certData.data()), certData.size());
+    if (ret != 0)
+    {
+        mbedtls_x509_crt_free(&cert);
+        return "OP_ERROR";
+    }
+
+    char pubKeyBuffer[2048] = {0};
+    ret                     = mbedtls_pk_write_pubkey_pem(&cert.pk, reinterpret_cast<unsigned char *>(pubKeyBuffer), sizeof(pubKeyBuffer));
+    mbedtls_x509_crt_free(&cert);
+    if (ret != 0)
+    {
+        return "OP_ERROR";
+    }
+    return std::string(pubKeyBuffer);
+}
 
 CommandManager::CommandManager()
 {
@@ -48,6 +103,10 @@ std::string CommandManager::ProcessCommand(const std::string &cmdOriginal)
     else if ((cmd[0] == 'g') && (cmd.size() > 1))
     {
         return CommandCryptoGet(cmd.substr(1));
+    }
+    else if ((cmd[0] == 'o') && (cmd.size() > 1))
+    {
+        return CommandCryptoOpen(cmd.substr(1));
     }
 
     return "SYNTAX_ERROR";
@@ -118,6 +177,63 @@ std::string CommandManager::CommandCryptoSet(const std::string &cmd)
         return cryptoManager.GetStoredCertsAndKeys();
     }
     return "SYNTAX_ERROR";
+}
+
+/**
+ * @brief Processes a command that receives a hex-encoded buffer which contains:
+ *        [2 bytes signature length][signature][ciphertext].
+ *
+ * The buffer is expected to have been produced by encrypting a message with the device's public key
+ * and then signing the ciphertext with the API's private key (encrypt-then-sign).
+ *
+ * The function performs the following steps:
+ * 1. Converts the hex string to a binary buffer.
+ * 2. Extracts the signature and ciphertext.
+ * 3. Loads the API public key from the API certificate.
+ * 4. Verifies the signature over the ciphertext.
+ * 5. If valid, decrypts the ciphertext using the device's private key.
+ * 6. Returns the plaintext message.
+ *
+ * @param cmd Hex string (without the command letter) representing the signed and encrypted buffer.
+ * @return The decrypted message on success, or an error code on failure.
+ */
+std::string CommandManager::CommandCryptoOpen(const std::string &cmd)
+{
+    std::string binBuffer = HexToBytes(cmd);
+    if (binBuffer.size() < 2)
+    {
+        return "BUFFER_TOO_SHORT";
+    }
+
+    uint16_t sigLen = (static_cast<unsigned char>(binBuffer[0]) << 8) | static_cast<unsigned char>(binBuffer[1]);
+    if (binBuffer.size() < 2 + sigLen)
+    {
+        return "INVALID_BUFFER";
+    }
+
+    std::vector<uint8_t> signature(binBuffer.begin() + 2, binBuffer.begin() + 2 + sigLen);
+    std::vector<uint8_t> ciphertext(binBuffer.begin() + 2 + sigLen, binBuffer.end());
+    std::string          apiPubKey = GetAPIPublicKey();
+    if (apiPubKey.empty())
+    {
+        return "API_CERT_ERROR";
+    }
+
+    bool verified = cryptoManager.VerifySignature(apiPubKey, ciphertext, signature);
+    if (!verified)
+    {
+        return "SIGNATURE_ERROR";
+    }
+
+    std::vector<uint8_t> decrypted;
+    bool                 decryptedOk = cryptoManager.DecryptWithPrivateKey(ciphertext, decrypted);
+    if (!decryptedOk)
+    {
+        return "DECRYPTION_ERROR";
+    }
+
+    std::string message(decrypted.begin(), decrypted.end());
+    return message;
 }
 
 std::string CommandManager::HexToBytes(const std::string &hex)

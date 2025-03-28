@@ -172,7 +172,7 @@ CreateDevice() {
     mkdir -p "$testDir"
 
     buffer="a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0a1b2c3d4e5f60718"
-    echo "$buffer" | xxd -r -p > "$testDir/buffer.bin"
+    echo -n "$buffer" > "$testDir/buffer.bin"
 
     openssl pkeyutl -encrypt -in "$testDir/buffer.bin" -pubin -inkey "$deviceName/$deviceId/${deviceName}_key_pub.der" -out "$testDir/buffer_encrypted.der"
     if [ $? -ne 0 ]; then
@@ -180,11 +180,19 @@ CreateDevice() {
         exit 1
     fi
 
-    openssl dgst -sha256 -sign "$apiDir/api_private_key.der" -out "$testDir/buffer_encrypted_api.sig" "$testDir/buffer_encrypted.der"
+    openssl rsa -in "$apiDir/api_private_key.der" -inform DER -out "$apiDir/api_private_key.pem" -outform PEM
+    if [ $? -ne 0 ]; then
+        echo "Error converting API private key to PEM."
+        exit 1
+    fi
+
+    openssl dgst -sha256 -sign "$apiDir/api_private_key.pem" -out "$testDir/buffer_encrypted_api.sig" "$testDir/buffer_encrypted.der"
     if [ $? -ne 0 ]; then
         echo "Error signing the buffer with the API key."
         exit 1
     fi
+
+    rm "$apiDir/api_private_key.pem"
 
     echo "Test signatures successfully generated in DER format."
     echo "Done."

@@ -20,6 +20,7 @@ def sendCommand(serialPort, commandDescription, commandData):
     time.sleep(2)
     response = serialPort.read_all().decode()
     print("Response:", response[:-2])
+    return response[:-2]
 
 def main():
     try:
@@ -75,6 +76,30 @@ def main():
         sendCommand(ser, "API certificate", hexData)
     else:
         print(f"Failed to open API cert file: {apiPath} not found")
+
+    sigPath = os.path.join("TestData", "1", "buffer_encrypted_api.sig")
+    cipherPath = os.path.join("TestData", "1", "buffer_encrypted.der")
+    bufferPath = os.path.join("TestData", "1", "buffer.bin")
+    if os.path.isfile(sigPath) and os.path.isfile(cipherPath)and os.path.isfile(bufferPath):
+        with open(sigPath, "rb") as sigFile:
+            sigData = sigFile.read()
+        with open(cipherPath, "rb") as cipherFile:
+            cipherData = cipherFile.read()
+        
+        sigLenHex = "{:04X}".format(len(sigData))
+        commandStr = "o" + sigLenHex + sigData.hex() + cipherData.hex()
+        answer = sendCommand(ser, "Open message", commandStr.encode("utf-8"))
+        with open(bufferPath, "rb") as bufferFile:
+            expected_answer = bufferFile.read().decode()
+        if(answer != expected_answer):
+            print("Error while receiving decrypted buffer")
+            print(f"Expected: {expectedAnswer}")
+            print(f"Received: {answer}")
+        else:
+            print("Received expected answer")
+
+    else:
+        print("Failed to open signature and/or ciphertext and/or open buffer file in TestData/1/")
 
     ser.close()
 

@@ -7,7 +7,6 @@
 #include "mbedtls/rsa.h"
 #include "mbedtls/error.h"
 
-// Helper function to obtain error messages from mbedtls.
 static std::string GetMbedtlsError(int ret)
 {
     char errorBuf[128];
@@ -48,7 +47,6 @@ static void TrimString(std::string &s)
 
 CertificateManager::CertificateManager()
 {
-    // Initialization if needed.
 }
 
 bool CertificateManager::VerifyCertificateSignature(const std::string &certData, const std::string &caCertData)
@@ -97,7 +95,6 @@ bool CertificateManager::VerifyCertificateSignature(const std::string &certData,
 
 bool CertificateManager::ValidateCertKeyMatch(const std::string &certData, const std::string &rsaKeyData)
 {
-    // Parse the certificate.
     mbedtls_x509_crt cert;
     mbedtls_x509_crt_init(&cert);
     int ret = mbedtls_x509_crt_parse(&cert, reinterpret_cast<const unsigned char *>(certData.data()), certData.size());
@@ -107,7 +104,6 @@ bool CertificateManager::ValidateCertKeyMatch(const std::string &certData, const
         return false;
     }
 
-    // Parse the RSA key.
     mbedtls_pk_context pk;
     mbedtls_pk_init(&pk);
     ret = mbedtls_pk_parse_key(&pk, reinterpret_cast<const unsigned char *>(rsaKeyData.data()), rsaKeyData.size(), nullptr, 0, nullptr, nullptr);
