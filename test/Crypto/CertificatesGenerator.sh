@@ -2,13 +2,16 @@
 
 Usage() {
     echo "Usage:"
-    echo "  $0 --all --deviceId <deviceId>   : Generate CA, API, and DEVICE certificates"
-    echo "  $0 --deviceId <deviceId>         : Generate only DEVICE certificate (requires existing CA/API)"
+    echo "  $0 [--all] [--RSA2048] --deviceId <deviceId>"
+    echo "      --all         : Generate CA, API, and DEVICE certificates"
+    echo "      --deviceId    : Specify the deviceId (required)"
+    echo "      --RSA2048    : Use RSA key size 2048 (default is 1024)"
     exit 1
 }
 
 # Default flags
 doAll=false
+rsaSize=1024
 deviceId=""
 
 # Parse parameters
@@ -16,18 +19,31 @@ if [ $# -eq 0 ]; then
     Usage
 fi
 
-if [ "$1" == "--all" ]; then
-    doAll=true
-    shift
-fi
-
-if [ "$1" == "--deviceId" ]; then
-    shift
-    deviceId=$1
-    shift
-else
-    Usage
-fi
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --all)
+            doAll=true
+            shift
+            ;;
+        --RSA2048)
+            rsaSize=2048
+            shift
+            ;;
+        --deviceId)
+            shift
+            if [ $# -eq 0 ]; then
+                echo "Error: deviceId not specified."
+                Usage
+            fi
+            deviceId=$1
+            shift
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            Usage
+            ;;
+    esac
+done
 
 if [ -z "$deviceId" ]; then
     echo "Error: deviceId not specified."
@@ -46,7 +62,7 @@ CreateCA() {
     mkdir -p "$caDir"
 
     echo "Generating CA private key in DER format..."
-    openssl genrsa -out "$caDir/${caDir}_key_priv.pem" 1024
+    openssl genrsa -out "$caDir/${caDir}_key_priv.pem" $rsaSize
     if [ $? -ne 0 ]; then
         echo "Error generating the CA private key."
         exit 1
@@ -71,7 +87,7 @@ CreateAPI() {
     mkdir -p "$apiDir"
 
     echo "Generating API private key in DER format..."
-    openssl genrsa -out "$apiDir/api_private_key.pem" 1024
+    openssl genrsa -out "$apiDir/api_private_key.pem" $rsaSize
     if [ $? -ne 0 ]; then
         echo "Error generating the API private key."
         exit 1
@@ -126,7 +142,7 @@ CreateDevice() {
     echo "Processing $deviceName in folder $deviceName/$deviceId..."
 
     # Generate private key (PEM), then convert to DER
-    openssl genrsa -out "$deviceName/$deviceId/${deviceName}_private_key.pem" 1024
+    openssl genrsa -out "$deviceName/$deviceId/${deviceName}_private_key.pem" $rsaSize
     if [ $? -ne 0 ]; then
         echo "Error generating RSA private key."
         exit 1

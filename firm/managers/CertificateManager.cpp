@@ -138,3 +138,62 @@ bool CertificateManager::ValidateCertKeyMatch(const std::string &certData, const
     mbedtls_x509_crt_free(&cert);
     return match;
 }
+
+int CertificateManager::GetRsaKeySizeFromCertificate(const std::string &certData)
+{
+    mbedtls_x509_crt cert;
+    mbedtls_x509_crt_init(&cert);
+    std::string certDataForParse = certData;
+    if (certData.find("-----BEGIN") != std::string::npos)
+    {
+        if (certDataForParse.back() != '\0')
+        {
+            certDataForParse.push_back('\0');
+        }
+    }
+    int ret = mbedtls_x509_crt_parse(&cert, reinterpret_cast<const unsigned char *>(certDataForParse.data()), certDataForParse.size());
+    if (ret != 0)
+    {
+        mbedtls_x509_crt_free(&cert);
+        return -1;
+    }
+    if (mbedtls_pk_get_type(&cert.pk) != MBEDTLS_PK_RSA)
+    {
+        mbedtls_x509_crt_free(&cert);
+        return -1;
+    }
+    mbedtls_rsa_context *rsa     = mbedtls_pk_rsa(cert.pk);
+    int                  keySize = static_cast<int>(mbedtls_rsa_get_len(rsa) * 8);
+    mbedtls_x509_crt_free(&cert);
+    return keySize;
+}
+
+int CertificateManager::GetRsaKeySizeFromKey(const std::string &keyData)
+{
+    mbedtls_pk_context pk;
+    mbedtls_pk_init(&pk);
+    std::string keyDataForParse = keyData;
+    if (keyData.find("-----BEGIN") != std::string::npos)
+    {
+        if (keyDataForParse.back() != '\0')
+        {
+            keyDataForParse.push_back('\0');
+        }
+    }
+    int ret = mbedtls_pk_parse_key(&pk, reinterpret_cast<const unsigned char *>(keyDataForParse.data()), keyDataForParse.size(), nullptr, 0, nullptr,
+                                   nullptr);
+    if (ret != 0)
+    {
+        mbedtls_pk_free(&pk);
+        return -1;
+    }
+    if (mbedtls_pk_get_type(&pk) != MBEDTLS_PK_RSA)
+    {
+        mbedtls_pk_free(&pk);
+        return -1;
+    }
+    mbedtls_rsa_context *rsa     = mbedtls_pk_rsa(pk);
+    int                  keySize = static_cast<int>(mbedtls_rsa_get_len(rsa) * 8);
+    mbedtls_pk_free(&pk);
+    return keySize;
+}

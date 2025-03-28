@@ -31,7 +31,7 @@ bool KeyStorageManager::StoreKey(const std::string &fileName, const std::string 
     return (written == keyData.size());
 }
 
-std::string KeyStorageManager::LoadCertificate(const std::string &fileName)
+std::string KeyStorageManager::LoadCertificate(const std::string &fileName) const
 {
     FILE *file = fopen(fileName.c_str(), "rb");
     if (!file)
@@ -52,7 +52,7 @@ std::string KeyStorageManager::LoadCertificate(const std::string &fileName)
     return data;
 }
 
-std::string KeyStorageManager::LoadKey(const std::string &fileName)
+std::string KeyStorageManager::LoadKey(const std::string &fileName) const
 {
     FILE *file = fopen(fileName.c_str(), "rb");
     if (!file)

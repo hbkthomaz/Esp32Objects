@@ -4,12 +4,11 @@
 #include <errno.h>
 #include <vector>
 
-CryptoManager::CryptoManager() : mountPoint("/spiffs")
+CryptoManager::CryptoManager() : mountPoint("/spiffs"), rsaKeySize(1024)
 {
-
 }
 
-std::string CryptoManager::GetFilePath(const std::string &fileName)
+std::string CryptoManager::GetFilePath(const std::string &fileName) const
 {
     std::string fullPath = mountPoint + "/" + fileName;
     return fullPath;
@@ -20,6 +19,12 @@ std::string CryptoManager::SetCertificate(CertificateId id, const std::string &c
     if (certData.size() < 100 || certData.size() > 4096)
     {
         return "INVALID_CERTIFICATE_SIZE";
+    }
+
+    int certRsaKeySize = certificateManager.GetRsaKeySizeFromCertificate(certData);
+    if (certRsaKeySize != rsaKeySize)
+    {
+        return "INVALID_RSA_KEY_SIZE";
     }
 
     std::string fileName;
@@ -111,6 +116,12 @@ std::string CryptoManager::GetCertificate(CertificateId id)
 
 std::string CryptoManager::SetKeyRSA(const std::string &keyData)
 {
+    int keyRsaKeySize = certificateManager.GetRsaKeySizeFromKey(keyData);
+    if (keyRsaKeySize != rsaKeySize)
+    {
+        return "INVALID_RSA_KEY_SIZE";
+    }
+
     std::string filePath = GetFilePath("device.key");
     bool        stored   = keyStorageManager.StoreKey(filePath, keyData);
     if (!stored)
@@ -203,4 +214,25 @@ bool CryptoManager::DecryptWithPrivateKey(const std::vector<uint8_t> &encrypted,
         return false;
     }
     return cryptoOperations.DecryptWithPrivateKey(keyData, encrypted, decrypted);
+}
+
+bool CryptoManager::CanChangeKeySize() const
+{
+    std::string caCert    = keyStorageManager.LoadCertificate(GetFilePath("ca.crt"));
+    std::string deviceKey = keyStorageManager.LoadKey(GetFilePath("device.key"));
+    return (caCert.empty() && deviceKey.empty());
+}
+
+bool CryptoManager::SetRsaKeySize(uint16_t newKeySize)
+{
+    if (!CanChangeKeySize())
+    {
+        return false;
+    }
+    if (newKeySize != 1024 && newKeySize != 2048)
+    {
+        return false;
+    }
+    rsaKeySize = newKeySize;
+    return true;
 }

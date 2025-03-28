@@ -40,6 +40,26 @@ class CertificateManager
      * @return true if the certificate and key match, false otherwise.
      */
     bool ValidateCertKeyMatch(const std::string &certData, const std::string &rsaKeyData);
+
+    /**
+     * @brief Extracts the RSA key size from a certificate.
+     *
+     * This function parses the certificate and returns the RSA key size in bits.
+     *
+     * @param certData The certificate data as a string.
+     * @return The RSA key size in bits, or -1 if extraction fails.
+     */
+    int GetRsaKeySizeFromCertificate(const std::string &certData);
+
+    /**
+     * @brief Extracts the RSA key size from an RSA key.
+     *
+     * This function parses the RSA key and returns the key size in bits.
+     *
+     * @param keyData The RSA key data as a string.
+     * @return The RSA key size in bits, or -1 if extraction fails.
+     */
+    int GetRsaKeySizeFromKey(const std::string &keyData);
 };
 
 #endif // CERTIFICATE_MANAGER_HPP

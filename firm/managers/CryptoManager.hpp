@@ -8,28 +8,29 @@
 #include "CryptoOperations.hpp"
 
 /**
- * @brief Certificate identifier types.
+ * @brief Enumeration for certificate identifier types.
  */
-typedef enum
+enum CertificateId
 {
     CA,     /**< CA certificate */
     DEVICE, /**< Device certificate */
     API     /**< API certificate */
-} CertificateId;
+};
 
 /**
- * @brief Facade class that manages storage, certificate validation, and cryptographic operations.
+ * @brief Facade class for managing certificates, keys, and cryptographic operations.
  *
- * This class provides a unified interface for:
- * - Storing and retrieving certificates and keys.
- * - Validating certificates (signature verification and key matching).
+ * This class provides methods for:
+ * - Storing and retrieving certificates and RSA keys in persistent storage.
+ * - Validating certificates (e.g., signature verification and key matching).
  * - Performing cryptographic operations such as signing, verifying, encryption, and decryption.
+ * - Configuring the RSA key size for new key generation (allowed only if no certificate/key exists).
  */
 class CryptoManager
 {
   public:
     /**
-     * @brief Construct a new CryptoManager object.
+     * @brief Constructs a new CryptoManager object.
      */
     CryptoManager();
 
@@ -37,11 +38,11 @@ class CryptoManager
      * @brief Stores a certificate.
      *
      * For DEVICE and API certificates, the certificate signature is verified against the stored CA certificate.
-     * For a DEVICE certificate, the certificate is also verified to match the stored RSA key.
+     * For a DEVICE certificate, the certificate is also checked against the stored RSA key.
      *
      * @param id The certificate identifier (CA, DEVICE, or API).
      * @param certData The certificate data as a string.
-     * @return "OK" if successful or an error code string if an error occurred.
+     * @return "OK" if successful, or an error code string if an error occurred.
      */
     std::string SetCertificate(CertificateId id, const std::string &certData);
 
@@ -49,22 +50,22 @@ class CryptoManager
      * @brief Retrieves a certificate in hexadecimal format.
      *
      * @param id The certificate identifier (CA, DEVICE, or API).
-     * @return The certificate data in hexadecimal format or an error code string if an error occurred.
+     * @return The certificate data as a hex string or an error code string if an error occurred.
      */
     std::string GetCertificate(CertificateId id);
 
     /**
-     * @brief Stores an RSA private key.
+     * @brief Stores the device's RSA private key.
      *
      * @param keyData The RSA key data as a string.
-     * @return "OK" if successful or an error code string if an error occurred.
+     * @return "OK" if successful, or an error code string if an error occurred.
      */
     std::string SetKeyRSA(const std::string &keyData);
 
     /**
      * @brief Retrieves the stored RSA key in hexadecimal format.
      *
-     * @return The RSA key data in hexadecimal format or an error code string if an error occurred.
+     * @return The RSA key data as a hex string or an error code string if an error occurred.
      */
     std::string GetKeyRSA();
 
@@ -78,21 +79,21 @@ class CryptoManager
     /**
      * @brief Returns a semicolon-separated list of stored certificate and key file names.
      *
-     * @return A semicolon-separated list of file names.
+     * @return A semicolon-separated string listing the file names.
      */
     std::string GetStoredCertsAndKeys();
 
     /**
      * @brief Signs data using the stored RSA private key.
      *
-     * @param data The data to be signed.
+     * @param data The data to sign.
      * @param signature The resulting signature (output).
      * @return true if signing was successful, false otherwise.
      */
     bool SignData(const std::vector<uint8_t> &data, std::vector<uint8_t> &signature);
 
     /**
-     * @brief Verifies a signature using a provided RSA public key.
+     * @brief Verifies a signature using the provided RSA public key.
      *
      * @param publicKeyData The RSA public key data as a string.
      * @param data The data that was signed.
@@ -102,10 +103,10 @@ class CryptoManager
     bool VerifySignature(const std::string &publicKeyData, const std::vector<uint8_t> &data, const std::vector<uint8_t> &signature);
 
     /**
-     * @brief Encrypts plaintext using a provided RSA public key.
+     * @brief Encrypts plaintext using the provided RSA public key.
      *
      * @param publicKeyData The RSA public key data as a string.
-     * @param plaintext The plaintext data to be encrypted.
+     * @param plaintext The plaintext data to encrypt.
      * @param encrypted The resulting encrypted data (output).
      * @return true if encryption was successful, false otherwise.
      */
@@ -114,17 +115,37 @@ class CryptoManager
     /**
      * @brief Decrypts ciphertext using the stored RSA private key.
      *
-     * @param encrypted The encrypted data to be decrypted.
+     * @param encrypted The encrypted data to decrypt.
      * @param decrypted The resulting decrypted data (output).
      * @return true if decryption was successful, false otherwise.
      */
     bool DecryptWithPrivateKey(const std::vector<uint8_t> &encrypted, std::vector<uint8_t> &decrypted);
+
+    /**
+     * @brief Checks whether it is permitted to change the RSA key size.
+     *
+     * The RSA key size can only be changed if neither the CA certificate nor the device key is stored.
+     *
+     * @return true if key size can be changed, false otherwise.
+     */
+    bool CanChangeKeySize() const;
+
+    /**
+     * @brief Sets the RSA key size for future key generation.
+     *
+     * This operation is allowed only if no CA certificate and no device key have been stored.
+     *
+     * @param newKeySize The desired RSA key size (e.g., 1024 or 2048).
+     * @return true if the key size was updated successfully, false otherwise.
+     */
+    bool SetRsaKeySize(uint16_t newKeySize);
 
   private:
     KeyStorageManager  keyStorageManager;  /**< Manager for storing keys and certificates */
     CertificateManager certificateManager; /**< Manager for certificate validation and matching */
     CryptoOperations   cryptoOperations;   /**< Cryptographic operations handler */
     std::string        mountPoint;         /**< Base mount point for storage files */
+    uint16_t           rsaKeySize;         /**< Configured RSA key size (default is 1024) */
 
     /**
      * @brief Constructs a full file path from a file name.
@@ -132,7 +153,7 @@ class CryptoManager
      * @param fileName The name of the file.
      * @return The full file path as a string.
      */
-    std::string GetFilePath(const std::string &fileName);
+    std::string GetFilePath(const std::string &fileName) const;
 };
 
 #endif // CRYPTO_MANAGER_HPP

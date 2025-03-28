@@ -84,6 +84,17 @@ class CommandManager
     std::string CommandCryptoOpen(const std::string &cmd);
 
     /**
+     * @brief Processes a command to set the RSA key size for future key generation.
+     *
+     * The command expects a numeric parameter (e.g., "1024" or "2048"). Changing the RSA key
+     * size is permitted only if neither the CA certificate nor the device key is already stored.
+     *
+     * @param cmd Subcommand string containing the desired RSA key size.
+     * @return "OK" if the key size was updated successfully, or an error code string otherwise.
+     */
+    std::string CommandRsaKeySize(const std::string &cmd);
+
+    /**
      * @brief Converts a hex string to its byte representation.
      *
      * Removes any whitespace and converts the resulting hex string into a binary buffer.

@@ -13,7 +13,7 @@ class KeyStorageManager
 {
   public:
     /**
-     * @brief Construct a new KeyStorageManager object.
+     * @brief Constructs a new KeyStorageManager object.
      */
     KeyStorageManager();
 
@@ -41,7 +41,7 @@ class KeyStorageManager
      * @param fileName The path to the file containing the certificate.
      * @return The certificate data as a string, or an empty string if an error occurred.
      */
-    std::string LoadCertificate(const std::string &fileName);
+    std::string LoadCertificate(const std::string &fileName) const;
 
     /**
      * @brief Loads a key from the specified file.
@@ -49,7 +49,7 @@ class KeyStorageManager
      * @param fileName The path to the file containing the key.
      * @return The key data as a string, or an empty string if an error occurred.
      */
-    std::string LoadKey(const std::string &fileName);
+    std::string LoadKey(const std::string &fileName) const;
 
     /**
      * @brief Removes the specified file.

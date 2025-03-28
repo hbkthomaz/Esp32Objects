@@ -12,10 +12,6 @@
 static FlashManager  flashManager;
 static CryptoManager cryptoManager;
 
-/**
- * @brief Helper function to load the API certificate and extract its public key.
- * @return The API public key in PEM format or an empty string on failure.
- */
 static std::string GetAPIPublicKey()
 {
     const std::string filePath = "/spiffs/api.crt";
@@ -108,6 +104,10 @@ std::string CommandManager::ProcessCommand(const std::string &cmdOriginal)
     {
         return CommandCryptoOpen(cmd.substr(1));
     }
+    else if ((cmd[0] == 'r') && (cmd.size() > 1))
+    {
+        return CommandRsaKeySize(cmd.substr(1));
+    }
 
     return "SYNTAX_ERROR";
 }
@@ -179,24 +179,6 @@ std::string CommandManager::CommandCryptoSet(const std::string &cmd)
     return "SYNTAX_ERROR";
 }
 
-/**
- * @brief Processes a command that receives a hex-encoded buffer which contains:
- *        [2 bytes signature length][signature][ciphertext].
- *
- * The buffer is expected to have been produced by encrypting a message with the device's public key
- * and then signing the ciphertext with the API's private key (encrypt-then-sign).
- *
- * The function performs the following steps:
- * 1. Converts the hex string to a binary buffer.
- * 2. Extracts the signature and ciphertext.
- * 3. Loads the API public key from the API certificate.
- * 4. Verifies the signature over the ciphertext.
- * 5. If valid, decrypts the ciphertext using the device's private key.
- * 6. Returns the plaintext message.
- *
- * @param cmd Hex string (without the command letter) representing the signed and encrypted buffer.
- * @return The decrypted message on success, or an error code on failure.
- */
 std::string CommandManager::CommandCryptoOpen(const std::string &cmd)
 {
     std::string binBuffer = HexToBytes(cmd);
@@ -234,6 +216,21 @@ std::string CommandManager::CommandCryptoOpen(const std::string &cmd)
 
     std::string message(decrypted.begin(), decrypted.end());
     return message;
+}
+
+std::string CommandManager::CommandRsaKeySize(const std::string &cmd)
+{
+    int newSize = std::stoi(cmd);
+    if (newSize != 1024 && newSize != 2048)
+    {
+        return "INVALID_RSA_KEY_SIZE";
+    }
+    if (!cryptoManager.CanChangeKeySize())
+    {
+        return "OPERATION_NOT_ALLOWED";
+    }
+    bool res = cryptoManager.SetRsaKeySize(static_cast<uint16_t>(newSize));
+    return res ? "OK" : "OPERATION_FAILED";
 }
 
 std::string CommandManager::HexToBytes(const std::string &hex)

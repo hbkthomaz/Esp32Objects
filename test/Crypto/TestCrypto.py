@@ -32,6 +32,7 @@ def main():
     scriptCommand = [
         r"C:\Program Files\Git\bin\bash.exe",
         "./CertificatesGenerator.sh",
+        "--RSA2048",
         "--all",
         "--deviceId",
         "1"
@@ -40,7 +41,7 @@ def main():
     subprocess.run(scriptCommand, check=True)
 
     sendCommand(ser, "memory clean", b"c@")
-
+    sendCommand(ser, "select RSA2048", b"r2048")
     caPath = os.path.join("CA", "CA.der")
     if os.path.isfile(caPath):
         with open(caPath, "rb") as fileHandle:
@@ -93,7 +94,7 @@ def main():
             expected_answer = bufferFile.read().decode()
         if(answer != expected_answer):
             print("Error while receiving decrypted buffer")
-            print(f"Expected: {expectedAnswer}")
+            print(f"Expected: {expected_answer}")
             print(f"Received: {answer}")
         else:
             print("Received expected answer")
