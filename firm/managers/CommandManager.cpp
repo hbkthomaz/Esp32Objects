@@ -68,31 +68,32 @@ std::string CommandManager::CommandCryptoGet(const std::string &cmd)
 {
     if ((cmd[0] == 'c') && (cmd.size() >= 2))
     {
-        char             certIdChar = cmd[1];
-        int              certIdInt  = static_cast<int>(certIdChar - '0');
-        certificateId_et certId     = static_cast<certificateId_et>(certIdInt);
-        return cryptoManager.CertificateGet(certId);
+        char          certIdChar = cmd[1];
+        int           certIdInt  = static_cast<int>(certIdChar - '0');
+        CertificateId certId     = static_cast<CertificateId>(certIdInt);
+        return cryptoManager.GetCertificate(certId);
     }
     else if ((cmd[0] == 'k') && (cmd.size() >= 2))
     {
-        return cryptoManager.KeyGetRSA();
+        return cryptoManager.GetKeyRSA();
     }
     return "SYNTAX_ERROR";
 }
+
 std::string CommandManager::CommandCryptoSet(const std::string &cmd)
 {
     if ((cmd[0] == 'c') && (cmd.size() > 2))
     {
-        char             certIdChar = cmd[1];
-        int              certIdInt  = static_cast<int>(certIdChar - '0');
-        certificateId_et certId     = static_cast<certificateId_et>(certIdInt);
-        std::string      hexBuffer  = cmd.substr(2);
-        std::string      binBuffer  = HexToBytes(hexBuffer);
+        char          certIdChar = cmd[1];
+        int           certIdInt  = static_cast<int>(certIdChar - '0');
+        CertificateId certId     = static_cast<CertificateId>(certIdInt);
+        std::string   hexBuffer  = cmd.substr(2);
+        std::string   binBuffer  = HexToBytes(hexBuffer);
         if (binBuffer.empty())
         {
             return "HEX_CONVERSION_ERROR";
         }
-        return cryptoManager.CertificateSet(certId, binBuffer, static_cast<uint32_t>(binBuffer.size()));
+        return cryptoManager.SetCertificate(certId, binBuffer);
     }
     else if ((cmd[0] == 'k') && (cmd.size() > 1))
     {
@@ -102,7 +103,7 @@ std::string CommandManager::CommandCryptoSet(const std::string &cmd)
         {
             return "HEX_CONVERSION_ERROR";
         }
-        return cryptoManager.KeySetRSA(binBuffer, static_cast<uint32_t>(binBuffer.size()));
+        return cryptoManager.SetKeyRSA(binBuffer);
     }
     else if ((cmd[0] == '@') && (cmd.size() == 1))
     {
