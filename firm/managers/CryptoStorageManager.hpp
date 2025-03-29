@@ -1,5 +1,5 @@
-#ifndef KEY_STORAGE_MANAGER_HPP
-#define KEY_STORAGE_MANAGER_HPP
+#ifndef CRYPTO_STORAGE_MANAGER_HPP
+#define CRYPTO_STORAGE_MANAGER_HPP
 
 #include <string>
 
@@ -9,47 +9,30 @@
  * This class provides methods for storing, loading, removing, and checking the existence
  * of keys and certificates in the file system.
  */
-class KeyStorageManager
+class CryptoStorageManager
 {
   public:
     /**
-     * @brief Constructs a new KeyStorageManager object.
+     * @brief Constructs a new CryptoStorageManager object.
      */
-    KeyStorageManager();
-
-    /**
-     * @brief Stores a certificate to the specified file.
-     *
-     * @param fileName The path to the file where the certificate will be stored.
-     * @param certData The certificate data as a string.
-     * @return true if the certificate was successfully stored, false otherwise.
-     */
-    bool StoreCertificate(const std::string &fileName, const std::string &certData);
+    CryptoStorageManager();
 
     /**
      * @brief Stores a key to the specified file.
      *
      * @param fileName The path to the file where the key will be stored.
-     * @param keyData The key data as a string.
-     * @return true if the key was successfully stored, false otherwise.
+     * @param keyData The data as a string.
+     * @return true if the data was successfully stored, false otherwise.
      */
-    bool StoreKey(const std::string &fileName, const std::string &keyData);
-
-    /**
-     * @brief Loads a certificate from the specified file.
-     *
-     * @param fileName The path to the file containing the certificate.
-     * @return The certificate data as a string, or an empty string if an error occurred.
-     */
-    std::string LoadCertificate(const std::string &fileName) const;
+    bool StoreData(const std::string &fileName, const std::string &data);
 
     /**
      * @brief Loads a key from the specified file.
      *
-     * @param fileName The path to the file containing the key.
-     * @return The key data as a string, or an empty string if an error occurred.
+     * @param fileName The path to the file containing the data.
+     * @return The data as a string, or an empty string if an error occurred.
      */
-    std::string LoadKey(const std::string &fileName) const;
+    std::string LoadData(const std::string &fileName) const;
 
     /**
      * @brief Removes the specified file.
@@ -68,4 +51,4 @@ class KeyStorageManager
     bool Exists(const std::string &fileName);
 };
 
-#endif // KEY_STORAGE_MANAGER_HPP
+#endif // CRYPTO_STORAGE_MANAGER_HPP

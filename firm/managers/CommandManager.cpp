@@ -66,6 +66,7 @@ CommandManager::CommandManager()
 void CommandManager::Init()
 {
     flashManager.Init();
+    cryptoManager.Init();
 }
 
 std::string CommandManager::ProcessCommand(const std::string &cmdOriginal)

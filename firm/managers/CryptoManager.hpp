@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-#include "KeyStorageManager.hpp"
+#include "CryptoStorageManager.hpp"
 #include "CertificateManager.hpp"
 #include "CryptoOperations.hpp"
 
@@ -31,8 +31,15 @@ class CryptoManager
   public:
     /**
      * @brief Constructs a new CryptoManager object.
+     *
+     * Initializes the mount point and loads the RSA key size from persistent storage.
      */
     CryptoManager();
+
+    /**
+     * @brief Initializes the CryptoManager.
+     */
+    void Init(void);
 
     /**
      * @brief Stores a certificate.
@@ -141,11 +148,11 @@ class CryptoManager
     bool SetRsaKeySize(uint16_t newKeySize);
 
   private:
-    KeyStorageManager  keyStorageManager;  /**< Manager for storing keys and certificates */
-    CertificateManager certificateManager; /**< Manager for certificate validation and matching */
-    CryptoOperations   cryptoOperations;   /**< Cryptographic operations handler */
-    std::string        mountPoint;         /**< Base mount point for storage files */
-    uint16_t           rsaKeySize;         /**< Configured RSA key size (default is 1024) */
+    CryptoStorageManager cryptoStorageManager; /**< Manager for storing keys and certificates */
+    CertificateManager   certificateManager;   /**< Manager for certificate validation and matching */
+    CryptoOperations     cryptoOperations;     /**< Cryptographic operations handler */
+    std::string          mountPoint;           /**< Base mount point for storage files */
+    uint16_t             rsaKeySize;           /**< Configured RSA key size (default is 1024) */
 
     /**
      * @brief Constructs a full file path from a file name.
@@ -154,6 +161,20 @@ class CryptoManager
      * @return The full file path as a string.
      */
     std::string GetFilePath(const std::string &fileName) const;
+
+    /**
+     * @brief Loads the RSA key size from persistent storage.
+     *
+     * If the value is invalid or missing, defaults to 1024.
+     */
+    void LoadRsaKeySizeFromStorage();
+
+    /**
+     * @brief Saves the current RSA key size to persistent storage.
+     *
+     * @return true if saved successfully, false otherwise.
+     */
+    bool SaveRsaKeySizeToStorage();
 };
 
 #endif // CRYPTO_MANAGER_HPP

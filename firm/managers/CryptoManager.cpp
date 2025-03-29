@@ -3,15 +3,47 @@
 #include <cstring>
 #include <errno.h>
 #include <vector>
+#include <cstdlib>
 
 CryptoManager::CryptoManager() : mountPoint("/spiffs"), rsaKeySize(1024)
 {
+}
+
+void CryptoManager::Init()
+{
+    LoadRsaKeySizeFromStorage();
 }
 
 std::string CryptoManager::GetFilePath(const std::string &fileName) const
 {
     std::string fullPath = mountPoint + "/" + fileName;
     return fullPath;
+}
+
+void CryptoManager::LoadRsaKeySizeFromStorage()
+{
+    std::string filePath   = GetFilePath("rsaKeySize.cfg");
+    std::string storedData = cryptoStorageManager.LoadData(filePath);
+    if (!storedData.empty())
+    {
+        char *endPtr = nullptr;
+        long  parsed = std::strtol(storedData.c_str(), &endPtr, 10);
+        if (endPtr != storedData.c_str() && *endPtr == '\0' && parsed > 0)
+        {
+            rsaKeySize = static_cast<uint16_t>(parsed);
+        }
+        else
+        {
+            rsaKeySize = 1024;
+        }
+    }
+}
+
+bool CryptoManager::SaveRsaKeySizeToStorage()
+{
+    std::string filePath = GetFilePath("rsaKeySize.cfg");
+    std::string data     = std::to_string(rsaKeySize);
+    return cryptoStorageManager.StoreData(filePath, data);
 }
 
 std::string CryptoManager::SetCertificate(CertificateId id, const std::string &certData)
@@ -46,7 +78,7 @@ std::string CryptoManager::SetCertificate(CertificateId id, const std::string &c
     if (id == DEVICE || id == API)
     {
         std::string caFilePath = GetFilePath("ca.crt");
-        std::string caCertData = keyStorageManager.LoadCertificate(caFilePath);
+        std::string caCertData = cryptoStorageManager.LoadData(caFilePath);
         if (caCertData.empty())
         {
             return "CA_NOT_LOADED_ERROR";
@@ -60,7 +92,7 @@ std::string CryptoManager::SetCertificate(CertificateId id, const std::string &c
     if (id == DEVICE)
     {
         std::string keyFilePath = GetFilePath("device.key");
-        std::string rsaKeyData  = keyStorageManager.LoadKey(keyFilePath);
+        std::string rsaKeyData  = cryptoStorageManager.LoadData(keyFilePath);
         if (rsaKeyData.empty())
         {
             return "RSA_KEY_NOT_LOADED_ERROR";
@@ -72,7 +104,7 @@ std::string CryptoManager::SetCertificate(CertificateId id, const std::string &c
     }
 
     std::string filePath = GetFilePath(fileName);
-    bool        stored   = keyStorageManager.StoreCertificate(filePath, certData);
+    bool        stored   = cryptoStorageManager.StoreData(filePath, certData);
     if (!stored)
     {
         return "CERT_FILE_WRITE_ERROR";
@@ -98,7 +130,7 @@ std::string CryptoManager::GetCertificate(CertificateId id)
             return "SYNTAX_ERROR";
     }
     std::string filePath = GetFilePath(fileName);
-    std::string certData = keyStorageManager.LoadCertificate(filePath);
+    std::string certData = cryptoStorageManager.LoadData(filePath);
     if (certData.empty())
     {
         return "OP_ERROR";
@@ -123,7 +155,7 @@ std::string CryptoManager::SetKeyRSA(const std::string &keyData)
     }
 
     std::string filePath = GetFilePath("device.key");
-    bool        stored   = keyStorageManager.StoreKey(filePath, keyData);
+    bool        stored   = cryptoStorageManager.StoreData(filePath, keyData);
     if (!stored)
     {
         return "KEY_FILE_WRITE_ERROR";
@@ -134,7 +166,7 @@ std::string CryptoManager::SetKeyRSA(const std::string &keyData)
 std::string CryptoManager::GetKeyRSA()
 {
     std::string filePath = GetFilePath("device.key");
-    std::string keyData  = keyStorageManager.LoadKey(filePath);
+    std::string keyData  = cryptoStorageManager.LoadData(filePath);
     if (keyData.empty())
     {
         return "OP_ERROR";
@@ -153,11 +185,11 @@ std::string CryptoManager::GetKeyRSA()
 bool CryptoManager::CleanCrypto()
 {
     bool        allRemoved = true;
-    const char *files[]    = {"ca.crt", "device.crt", "api.crt", "device.key"};
+    const char *files[]    = {"ca.crt", "device.crt", "api.crt", "device.key", "rsaKeySize.cfg"};
     for (const char *fileName : files)
     {
         std::string filePath = GetFilePath(fileName);
-        if (!keyStorageManager.RemoveFile(filePath))
+        if (!cryptoStorageManager.RemoveFile(filePath))
         {
             allRemoved = false;
         }
@@ -168,11 +200,11 @@ bool CryptoManager::CleanCrypto()
 std::string CryptoManager::GetStoredCertsAndKeys()
 {
     std::string result;
-    const char *files[] = {"ca.crt", "device.crt", "api.crt", "device.key"};
+    const char *files[] = {"ca.crt", "device.crt", "api.crt", "device.key", "rsaKeySize.cfg"};
     for (const char *fileName : files)
     {
         std::string filePath = GetFilePath(fileName);
-        if (keyStorageManager.Exists(filePath))
+        if (cryptoStorageManager.Exists(filePath))
         {
             if (!result.empty())
             {
@@ -187,7 +219,7 @@ std::string CryptoManager::GetStoredCertsAndKeys()
 bool CryptoManager::SignData(const std::vector<uint8_t> &data, std::vector<uint8_t> &signature)
 {
     std::string filePath = GetFilePath("device.key");
-    std::string keyData  = keyStorageManager.LoadKey(filePath);
+    std::string keyData  = cryptoStorageManager.LoadData(filePath);
     if (keyData.empty())
     {
         return false;
@@ -208,7 +240,7 @@ bool CryptoManager::EncryptWithPublicKey(const std::string &publicKeyData, const
 bool CryptoManager::DecryptWithPrivateKey(const std::vector<uint8_t> &encrypted, std::vector<uint8_t> &decrypted)
 {
     std::string filePath = GetFilePath("device.key");
-    std::string keyData  = keyStorageManager.LoadKey(filePath);
+    std::string keyData  = cryptoStorageManager.LoadData(filePath);
     if (keyData.empty())
     {
         return false;
@@ -218,8 +250,8 @@ bool CryptoManager::DecryptWithPrivateKey(const std::vector<uint8_t> &encrypted,
 
 bool CryptoManager::CanChangeKeySize() const
 {
-    std::string caCert    = keyStorageManager.LoadCertificate(GetFilePath("ca.crt"));
-    std::string deviceKey = keyStorageManager.LoadKey(GetFilePath("device.key"));
+    std::string caCert    = cryptoStorageManager.LoadData(GetFilePath("ca.crt"));
+    std::string deviceKey = cryptoStorageManager.LoadData(GetFilePath("device.key"));
     return (caCert.empty() && deviceKey.empty());
 }
 
@@ -234,5 +266,9 @@ bool CryptoManager::SetRsaKeySize(uint16_t newKeySize)
         return false;
     }
     rsaKeySize = newKeySize;
+    if (!SaveRsaKeySizeToStorage())
+    {
+        return false;
+    }
     return true;
 }

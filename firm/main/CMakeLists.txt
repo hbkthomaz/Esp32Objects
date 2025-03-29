@@ -7,7 +7,7 @@ idf_component_register(SRCS
     "../managers/FlashManager.cpp"
     "../managers/CryptoManager.cpp"
     "../managers/CertificateManager.cpp"
-    "../managers/KeyStorageManager.cpp"
+    "../managers/CryptoStorageManager.cpp"
     "../managers/CryptoOperations.cpp"
     "../managers/CommandManager.cpp"
 INCLUDE_DIRS "." "../tasks" "../managers")
