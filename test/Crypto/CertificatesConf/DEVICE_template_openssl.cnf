@@ -1,0 +1,42 @@
+[ req ]
+default_bits = 1048
+prompt = no
+default_md = sha256
+distinguished_name = req_distinguished_name
+x509_extensions = v3_ca
+
+[ req_distinguished_name ]
+C = BR
+ST = SomeState
+L = SomeCity
+O = IndustrySA
+OU = SomeInformation
+CN = XXXXXXXXXX # hardware id
+emailAddress = emal@email.com
+
+[ v3_ca ]
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints = critical,CA:false
+keyUsage = critical,digitalSignature,keyEncipherment,cRLSign,keyCertSign
+
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+default_days = 3650 # 10 years
+default_md = sha256
+preserve = no
+email_in_dn = no
+name_opt = ca_default
+cert_opt = ca_default
+policy = policy_match
+
+[ policy_match ]
+countryName = match
+stateOrProvinceName = match
+localityName = match
+organizationName = match
+organizationalUnitName = optional
+commonName = supplied
+emailAddress = optional
